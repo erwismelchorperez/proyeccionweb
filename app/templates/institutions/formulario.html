@@ -1,0 +1,15 @@
+{% extends 'base.html' %}
+{% block content %}
+
+<form method="POST">
+    {{ form.hidden_tag() }}
+    <div class="form-group mb-3">
+        {{ form.nombre.label }} {{ form.nombre(class="form-control") }}
+    </div>
+    <div class="form-group mb-3">
+        {{ form.descripcion.label }} {{ form.descripcion(class="form-control") }}
+    </div>
+    {{ form.submit(class="btn btn-success mt-2") }}
+    <a href="{{ url_for('institutions.listar') }}" class="btn btn-secondary mt-2">Cancelar</a>
+</form>
+{% endblock %}
