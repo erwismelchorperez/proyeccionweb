@@ -10,3 +10,32 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), unique=True, nullable=False)
     email = db.Column(db.String(120), unique=True, nullable=False)
     password = db.Column(db.String(255), nullable=False)
+    rol = db.Column(db.String(50), nullable=False, default='usuario')  # puede ser 'admin' o 'usuario'
+
+    institution_id = db.Column(db.Integer, db.ForeignKey('institution.id'), nullable=False)
+
+
+class Institution(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(150), nullable=False)
+    descripcion = db.Column(db.Text, nullable=True)
+    fecha_creacion = db.Column(db.DateTime, server_default=db.func.now())
+
+    usuarios = db.relationship('User', backref='institution', lazy=True, cascade="all, delete")
+    
+    def __repr__(self):
+        return f"<Institution {self.nombre}>"
+
+class TemplateBalance(db.Model):
+    __tablename__ = 'templateBalance'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)  # si quieres agregar un id único
+    nivel = db.Column(db.String(50))
+    cuenta = db.Column(db.String(50))
+    codigo = db.Column(db.String(10))
+    proyeccion = db.Column(db.String(2))
+    fechacierre = db.Column(db.Date)
+    institution_id = db.Column(db.Integer, db.ForeignKey('institution.id'))
+
+    # Relación inversa, opcional (si quieres acceder a la institución desde este modelo)
+    institution = db.relationship('Institution', backref=db.backref('balances', lazy=True))

@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+{% block content %}
+
+
+<div class="container">
+    <div class="row align-items-start">
+        <div class="col">
+            <h2>Instituciones</h2>
+        </div>
+        <div class="col">
+            
+        </div>
+        <div class="col text-rigth">
+            <a href="{{ url_for('institutions.nueva') }}" class="btn btn-sm">
+                <i class="fas fa-plus text-primary" style="font-size: 36px;"></i>
+            </a>
+        </div>
+    </div>
+</div>
+<table class="table mt-3">
+    <thead><tr><th>Nombre</th><th>Descripción</th><th>Acciones</th></tr></thead>
+    <tbody>
+        {% for inst in instituciones %}
+        <tr>
+            <td>{{ inst.nombre }}</td>
+            <td>{{ inst.descripcion }}</td>
+            <td>
+                <a href="{{ url_for('institutions.editar', id=inst.id) }}" class="btn btn-sm">
+                    <i class="far fa-edit text-primary" style="font-size: 36px;"></i>
+                </a>
+                <form method="POST" action="{{ url_for('institutions.eliminar', id=inst.id) }}" style="display:inline;">
+                    <button class="btn btn-sm" onclick="return confirm('¿Eliminar?')"> 
+                        <i class="far fa-trash-alt text-danger" style="font-size: 36px;"></i>
+                    </button>
+                </form>
+                <a href="{{ url_for('institutions.editar', id=inst.id) }}" class="btn btn-sm ">
+                    <i class="fas fa-file-csv text-success" style="font-size: 36px;"></i>
+                </a>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endblock %}

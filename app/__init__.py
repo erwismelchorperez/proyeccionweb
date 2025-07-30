@@ -19,6 +19,9 @@ def create_app():
     from .auth import auth_bp
     app.register_blueprint(auth_bp)
 
+    from app.institutions.routes import institutions_bp
+    app.register_blueprint(institutions_bp)
+
     @app.route('/')
     def index():
         if current_user.is_authenticated:
