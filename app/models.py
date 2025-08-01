@@ -34,8 +34,24 @@ class TemplateBalance(db.Model):
     cuenta = db.Column(db.String(50))
     codigo = db.Column(db.String(10))
     proyeccion = db.Column(db.String(2))
-    fechacierre = db.Column(db.Date)
+    #fechacierre = db.Column(db.Date)
     institution_id = db.Column(db.Integer, db.ForeignKey('institution.id'))
 
     # Relación inversa, opcional (si quieres acceder a la institución desde este modelo)
     institution = db.relationship('Institution', backref=db.backref('balances', lazy=True))
+
+class ValidacionTemplate(db.Model):
+    __tablename__ = 'validaciones_template'
+
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    institucion_id = db.Column(db.Integer, db.ForeignKey('institution.id'), nullable=False)
+    descripcion = db.Column(db.Text, nullable=True)
+    cuenta_objetivo = db.Column(db.String(50), nullable=False)
+    expresion = db.Column(db.String(100), nullable=False)  # Ej: '+5+6+7'
+    operador = db.Column(db.String(5), default='=')
+    activo = db.Column(db.Boolean, default=True)
+
+    institucion = db.relationship('Institution', backref=db.backref('validaciones', lazy=True, cascade='all, delete'))
+
+    def __repr__(self):
+        return f"<ValidacionTemplate {self.descripcion}>"
