@@ -1,63 +1,162 @@
 {% extends 'base.html' %}
 {% block content %}
 <div class="container">
-    <h3>{{ institucion.nombre }}</h3>
-    {% if mostrar_formulario %}
-        <h1>Subir Template de Balance</h1>
-        <form method="POST" enctype="multipart/form-data">
-            {{ form.hidden_tag() }}
-            <p>
-                {{ form.institucion.label }}<br>
-                {{ form.institucion() }}
-            </p>
-            <p>
-                {{ form.archivo.label }}<br>
-                {{ form.archivo() }}
-            </p>
-            <p><input type="submit" value="Subir Template"></p>
-        </form>
-    <!--<p><strong>Ya existe un template para esta institución.</strong></p>-->
-    {% endif %}
-    {% if templates %}
-        <h5>Template actual cargado:</h5>
-        <div class="container">
-            <div class="row">
-                <div class="col-8">
-                    <table class="table table-bordered table-scroll">
-                        <thead class="table-light">
-                            <tr>
-                                <th>Nivel</th>
-                                <th>Cuenta</th>
-                                <th>Código</th>
-                                <th>Proyección</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for t in templates %}
+    <div class="row text-end">
+        <div class="col-6">
+
+        </div>
+        <div class="col-6">
+            <a href="{{ url_for('institutions.listar') }}" class="btn btn-sm btn-secondary">Regresar</a>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col-6">
+            <h3>{{ institucion.nombre }}</h3>
+            {% if mostrar_formulario %}
+                <h1>Subir Template de Balance</h1>
+                <form method="POST" enctype="multipart/form-data">
+                    {{ form.hidden_tag() }}
+                    <p>
+                        {{ form.institucion.label }}<br>
+                        {{ form.institucion() }}
+                    </p>
+                    <p>
+                        {{ form.archivo.label }}<br>
+                        {{ form.archivo() }}
+                    </p>
+                    <p><input type="submit" value="Subir Template"></p>
+                </form>
+            <!--<p><strong>Ya existe un template para esta institución.</strong></p>-->
+            {% endif %}
+            {% if templates %}
+                <div class="container">
+                    <div class="content">
+                        <table class="table table-bordered table-scroll">
+                            <thead class="table-light">
                                 <tr>
-                                    <td>{{ t.nivel }}</td>
-                                    <td>{{ t.cuenta }}</td>
-                                    <td>{{ t.codigo }}</td>
-                                    <td>{{ t.proyeccion }}</td>
+                                    <th>Nivel</th>
+                                    <th>Cuenta</th>
+                                    <th>Código</th>
+                                    <th>Proyección</th>
                                 </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody>
+                                {% for t in templates %}
+                                    <tr>
+                                        <td>{{ t.nivel }}</td>
+                                        <td>{{ t.cuenta }}</td>
+                                        <td>{{ t.codigo }}</td>
+                                        <td>{{ t.proyeccion }}</td>
+                                    </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
-                <div class="col-4">
-                    <div class='row'>
-                        <div class='col-6'>
-                            <h5>Validaciones</h5>
+            {% endif %}
+        </div>
+        <div class="col-6">
+            {% if templates %}
+                <div class='container'>
+                    <div class="content">
+                        <div class="row">
+                            <div class='col-6'>
+                                <div class="row">
+                                    <div class="col-6">
+                                        <h5>Validaciones</h5>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class='col-6'>
+                                <div class="row">
+                                    <div class="row text-end">
+                                        {% if mostrar_validaciones %}                            
+                                            <a href="#" class="btn btn-sm btn-primary">Generar validaciones</a>
+                                        {% endif %}
+                                        <!-- Button trigger modal -->
+                                        <button type="button" class="btn" data-bs-toggle="modal" data-bs-target="#exampleModal">
+                                            <i class="fas fa-plus text-primary" style="font-size: 24px;"></i>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        <div class='col-6'>
-                            {% if mostrar_validaciones %}                            
-                                <a href="#" class="btn btn-sm btn-primary">Generar validaciones</a>
-                            {% endif %}
+                        <div class="row">
+                            <table class="table mt-3">
+                                <thead>
+                                    <tr>
+                                        <th>Descripción</th>
+                                        <th>Cuenta</th>
+                                        <th>Formula</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for t in validaciones %}
+                                        <tr>
+                                            <td>{{ t.descripcion }}</td>
+                                            <td>{{ t.cuenta_objetivo }}</td>
+                                            <td>{{ t.expresion }}</td>
+                                        </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Modal -->
+                        <div class="modal fade" id="exampleModal" tabindex="-1" aria-labelledby="exampleModalLabel" aria-hidden="true">
+                            <div class="modal-dialog">
+                                <div class="modal-content">
+                                    <div class="modal-header">
+                                        <h1 class="modal-title fs-5" id="exampleModalLabel">Agregar Validación</h1>
+                                        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                    </div>
+                                    <div class="modal-body">
+                                        <form method="POST">
+                                            {{ formTemplate.formulario }}
+                                            <div class="form-group mb-3">
+                                                {{ formTemplate.cuenta_objetivo.label }} {{ formTemplate.cuenta_objetivo(class="form-select", id="cuenta_objetivo") }}
+                                            </div>
+                                            <div class="form-group mb-3">
+                                                {{ formTemplate.descripcion.label }}
+                                                {{ formTemplate.descripcion(class="form-control", id="descripcion") }}
+                                            </div>
+                                            <div class="form-group mb-3">
+                                                {{ formTemplate.expresion.label }}
+                                                {{ formTemplate.expresion(class="form-control", id="expresion") }}
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                                                <button type="submit" class="btn btn-primary">Guardar</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
+            {% endif %}
         </div>
-    {% endif %}
+    </div>
 </div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const select = document.getElementById('cuenta_objetivo');
+    const descripcionInput = document.getElementById('descripcion');
+
+    select.addEventListener('change', function () {
+        // Obtener el texto del option seleccionado (ej. "10401 - Caja General")
+        const selectedText = select.options[select.selectedIndex].text;
+
+        // Extraer solo la descripción (después del guion)
+        const parts = selectedText.split(' - ');
+        if (parts.length > 1) {
+            descripcionInput.value = parts[1].trim(); // "Caja General"
+        } else {
+            descripcionInput.value = '';
+        }
+    });
+});
+</script>
 {% endblock %}
