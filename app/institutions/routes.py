@@ -1,7 +1,10 @@
 from flask import Blueprint, render_template, redirect, url_for, flash, request
 from app import db
+import io
+import csv
+from werkzeug.utils import secure_filename
 from app.models import Institution, TemplateBalance, ValidacionTemplate
-from .forms import InstitutionForm, SubirTemplateForm
+from .forms import InstitutionForm, SubirTemplateForm, ValidacionTemplateForm
 
 institutions_bp = Blueprint('institutions', __name__, template_folder='templates')
 
@@ -45,6 +48,7 @@ def eliminar(id):
 ###### Apartado para subir archivo csv
 @institutions_bp.route('/instituciones/subirtemplate/<int:id>', methods=['GET', 'POST'])
 def subirtemplate(id):
+    formTemplate = ValidacionTemplateForm()
     institucion = Institution.query.get_or_404(id)
     form = SubirTemplateForm()
     form.institucion.choices = [(i.id, i.nombre) for i in Institution.query.all()]
@@ -53,32 +57,47 @@ def subirtemplate(id):
     mostrar_formulario = True
     mostrar_validaciones = True
     templates = TemplateBalance.query.filter_by(institution_id=institucion.id).all()
+
+    formTemplate.cuenta_objetivo.choices = [(t.codigo, f"{t.codigo} - {t.cuenta}") for t in templates]
     validaciones = ValidacionTemplate.query.filter_by(institucion_id=institucion.id).all()
     if templates:
         mostrar_formulario = False
     if validaciones:
         mostrar_validaciones = False
 
-    if request.method == 'POST' and form.validate_on_submit():
-        archivo = form.archivo.data
-        institucion_id = form.institucion.data
-
-        # Leer el contenido del archivo directamente sin guardarlo
-        stream = io.StringIO(archivo.stream.read().decode("utf-8-sig"))
-        reader = csv.DictReader(stream)
-
-        for row in reader:
-            template = TemplateBalance(
-                nivel=row['nivel'],
-                cuenta=row['cuenta'],
-                codigo=row['codigo'].strip(),
-                proyeccion=row['proyeccion'].strip(),
-                institution_id=institucion_id
+    if request.method == 'POST':
+        if request.form.get('formulario') == 'template_form':
+            nueva_validacion = ValidacionTemplate(
+                institucion_id=id,
+                descripcion=formTemplate.descripcion.data,
+                cuenta_objetivo=formTemplate.cuenta_objetivo.data,
+                expresion=formTemplate.expresion.data
             )
-            db.session.add(template)
+            db.session.add(nueva_validacion)
+            db.session.commit()
+            flash('Validación guardada correctamente.', 'success')
+            return redirect(url_for('institutions.subirtemplate', id=id))
+        
+        elif form.validate_on_submit():
+            archivo = form.archivo.data
+            institucion_id = form.institucion.data
 
-        db.session.commit()
-        flash('Template cargado directamente desde archivo en memoria.', 'success')
-        return redirect(url_for('institutions.subirtemplate', id=institucion_id))
+            # Leer el contenido del archivo directamente sin guardarlo
+            stream = io.StringIO(archivo.stream.read().decode("utf-8-sig"))
+            reader = csv.DictReader(stream)
 
-    return render_template('institutions/subirtemplate.html', form=form, institucion=institucion, templates=templates, mostrar_formulario=mostrar_formulario, mostrar_validaciones=mostrar_validaciones)
+            for row in reader:
+                template = TemplateBalance(
+                    nivel=row['nivel'],
+                    cuenta=row['cuenta'],
+                    codigo=row['codigo'].strip(),
+                    proyeccion=row['proyeccion'].strip(),
+                    institution_id=institucion_id
+                )
+                db.session.add(template)
+
+            db.session.commit()
+            flash('Template cargado directamente desde archivo en memoria.', 'success')
+            return redirect(url_for('institutions.subirtemplate', id=institucion_id))
+
+    return render_template('institutions/subirtemplate.html', form=form, institucion=institucion, templates=templates, mostrar_formulario=mostrar_formulario, mostrar_validaciones=mostrar_validaciones, validaciones=validaciones, formTemplate=formTemplate)
