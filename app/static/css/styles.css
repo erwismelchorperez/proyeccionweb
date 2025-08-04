@@ -34,7 +34,7 @@ body {
 
 .table-scroll tbody {
     display: block;
-    max-height: 500px; /* Ajusta según lo que necesites */
+    max-height: 600px; /* Ajusta según lo que necesites */
     overflow-y: auto;
 }
 
