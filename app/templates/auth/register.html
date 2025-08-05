@@ -1,124 +1,58 @@
-<!DOCTYPE html>
-<html lang="en">
-    <head>
-        <title>Sign up | Mantis Bootstrap 5 Admin Template</title>
-        <!-- [Meta] -->
-        <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=0, minimal-ui">
-        <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <meta name="description" content="Mantis is made using Bootstrap 5 design framework. Download the free admin template & use it for your project.">
-        <meta name="keywords" content="Mantis, Dashboard UI Kit, Bootstrap 5, Admin Template, Admin Dashboard, CRM, CMS, Bootstrap Admin Template">
-        <meta name="author" content="CodedThemes">
-        {% include 'partials/head.html' %}
-    </head>
-    <body>
-        <div class="loader-bg">
-            <div class="loader-track">
-                <div class="loader-fill"></div>
-            </div>
-        </div>
-        <div class="auth-main">
-            <div class="auth-wrapper v3">
-                <div class="auth-form">
-                        <div class="auth-header">
-                            <a href="#"><img src="{{ url_for('static', filename='assets/images/logo-dark.svg') }}" alt="img"></a>
-                        </div>
-                        <form class="card-body" method="POST" action="{{ url_for('auth.register') }}">
-                            {{ form.hidden_tag() }}
-                            <div class="card my-5">
-                                <div class="card-body">
-                                    <div class="d-flex justify-content-between align-items-end mb-4">
-                                        ¿Ya tienes una cuenta? <a href="{{ url_for('auth.login') }}">Inicia sesión aquí</a>
-                                    </div>
-                                    <div class="d-flex justify-content-between align-items-end mb-4">
-                                        <h3 class="mb-0"><b>Sign up</b></h3>
-                                    </div>
-                                    <div class="row">
-                                        <div class="col-md-6">
-                                            <div class="form-group mb-3">
-                                                <!--Nombre-->
-                                                {{ form.name.label(class="form-label") }}
-                                                {{ form.name(class="form-control") }}
-                                            </div>
-                                        </div>
-                                        <div class="col-md-6">
-                                            <div class="form-group mb-3">
-                                                <!--Apellido-->
-                                                {{ form.lastname.label(class="form-label") }}
-                                                {{ form.lastname(class="form-control") }}
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="form-group mb-3">
-                                        {{ form.username.label(class="form-label") }}
-                                        {{ form.username(class="form-control") }}
-                                    </div>
-                                    <div class="form-group mb-3">
-                                        {{ form.email.label(class="form-label") }}
-                                        {{ form.email(class="form-control") }}
-                                    </div>
-                                    <div class="form-group mb-3">
-                                        {{ form.password.label(class="form-label") }}
-                                        {{ form.password(class="form-control") }}
-                                    </div>
-                                    <div class="form-group mb-3">
-                                        {{ form.confirm_password.label(class="form-label") }}
-                                        {{ form.confirm_password(class="form-control") }}
-                                    </div>
-                                    <div class="d-grid mt-3">
-                                        <button type="submit" class="btn btn-primary">Registrarse</button>
-                                    </div>
-                                </div>
+{% extends 'base.html' %}
+{% block content %}
+    <div class="container">
+        <div class="content"> 
+            <form class="card-body" method="POST">
+                {{ form.hidden_tag() }}  <!-- ESTA LÍNEA ES OBLIGATORIA -->
+                <div class="col-6">
+                    <div class="form-group mb-3">
+                        {{ form.institution_id.label(class="form-label") }}
+                        {{ form.institution_id(class="form-control") }}
+                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <!--Nombre-->
+                                {{ form.name.label(class="form-label") }}
+                                {{ form.name(class="form-control") }}
                             </div>
-                        </form>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-group mb-3">
+                                <!--Apellido-->
+                                {{ form.lastname.label(class="form-label") }}
+                                {{ form.lastname(class="form-control") }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="form-group mb-3">
+                        {{ form.username.label(class="form-label") }}
+                        {{ form.username(class="form-control") }}
+                    </div>
+                    <div class="form-group mb-3">
+                        {{ form.email.label(class="form-label") }}
+                        {{ form.email(class="form-control") }}
+                    </div>
+                    <div class="form-group mb-3">
+                        {{ form.password.label(class="form-label") }}
+                        {{ form.password(class="form-control") }}
+                    </div>
+                    <div class="form-group mb-3">
+                        {{ form.confirm_password.label(class="form-label") }}
+                        {{ form.confirm_password(class="form-control") }}
+                    </div>
+                    <div class="row">
+                        <div class="col-6">
+
+                        </div>
+                        <div class="col-6 text-end">
+                            <a href="{{ url_for('auth.usuarios') }}" class="btn btn-secondary mt-2">Cancelar</a>
+                            {{ form.submit(class="btn btn-success mt-2") }}
+                        </div>
+                    </div>
                 </div>
-            </div>
+            </form>
         </div>
-        <script src="../assets/js/plugins/popper.min.js"></script>
-        <script src="../assets/js/plugins/simplebar.min.js"></script>
-        <script src="../assets/js/plugins/bootstrap.min.js"></script>
-        <script src="../assets/js/fonts/custom-font.js"></script>
-        <script src="../assets/js/pcoded.js"></script>
-        <script src="../assets/js/plugins/feather.min.js"></script>
+    </div>
+{% endblock %}
 
-        <script>layout_change('light');</script>
-        <script>change_box_container('false');</script>
-        <script>layout_rtl_change('false');</script>
-        <script>preset_change("preset-1");</script>
-        <script>font_change("Public-Sans");</script>
-    </body>
-
-</html>
-
-<!--
-<div class="d-flex align-items-center py-4 bg-body-tertiary">
-    <main class="form-signin w-100 m-auto">
-        <h2>Registro de usuario</h2>
-        <form class="p-4 p-md-5 border rounded-3 bg-body-tertiary" method="POST" action="{{ url_for('auth.register') }}">
-            {{ form.hidden_tag() }}
-            <div class="form-floating mb-3">
-                {{ form.username.label(class="form-label") }}
-                {{ form.username(class="form-control") }}
-            </div>
-            <div class="form-floating mb-3">
-                {{ form.email.label(class="form-label") }}
-                {{ form.email(class="form-control") }}
-            </div>
-            <div class="form-floating mb-3">
-                {{ form.password.label(class="form-label") }}
-                {{ form.password(class="form-control") }}
-            </div>
-            <div class="form-floating mb-3">
-                {{ form.confirm_password.label(class="form-label") }}
-                {{ form.confirm_password(class="form-control") }}
-            </div>
-            <div class="checkbox mb-3"> 
-                <p class="mt-3">
-                    ¿Ya tienes una cuenta? <a href="{{ url_for('auth.login') }}">Inicia sesión aquí</a>
-                </p>
-            </div>
-            <button type="submit" class="w-100 btn btn-lg btn-primary">Registrarse</button>
-        </form>
-    </main>
-</div>
--->
