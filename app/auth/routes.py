@@ -21,15 +21,20 @@ def login():
 
 @auth_bp.route('/register', methods=['GET', 'POST'])
 def register():
+    print("                 Registro de usuarios")
     form = RegisterForm()
+    form.institution_id.choices = [(0, 'Seleccione una institución')] + [(i.id, i.nombre) for i in Institution.query.all()]
+    print("   Validation                ",form.validate_on_submit())
     if form.validate_on_submit():
         hashed_pw = generate_password_hash(form.password.data)
-        user = User(username=form.username.data, name=form.name.data, lastname= form.lastname.data, email=form.email.data, password=hashed_pw)
+        user = User(username=form.username.data, name=form.name.data, lastname= form.lastname.data, email=form.email.data, password=hashed_pw, institution_id=form.institution_id.data)
         db.session.add(user)
         db.session.commit()
         flash('Registro exitoso. Ahora puedes iniciar sesión.', 'success')
         return redirect(url_for('auth.usuarios'))
-    return render_template('auth/usuarios.html', form=form)
+    else:
+        print(form.errors)  # <-- esto te dice qué campos fallaron y por qué
+    return render_template('auth/register.html', form=form)
 
 @auth_bp.route('/dashboard')
 @login_required
@@ -44,54 +49,40 @@ def logout():
 
 
 
-@auth_bp.route('/usuarios', methods=['GET', 'POST'])
-@login_required
+@auth_bp.route('/usuarios')
 def usuarios():
-    form = RegisterForm()
     usuarios = User.query.all()
-    # Cargar instituciones de la base de datos
-    institutions = Institution.query.all()
-    form.institution_id.choices = [(inst.id, inst.nombre) for inst in institutions]
-
-
+    return render_template('auth/usuarios.html', usuarios=usuarios)
+@auth_bp.route('/auth/eliminar/<int:id>', methods=['POST'])
+def eliminar(id):
+    usuario = User.query.get_or_404(id)
+    db.session.delete(usuario)
+    db.session.commit()
+    flash('Usuario eliminado.', 'info')
+    return redirect(url_for('auth.usuarios'))
+@auth_bp.route('/auth/editar/<int:id>', methods=['GET', 'POST'])
+def editar(id):
+    usuario = User.query.get_or_404(id)
+    form = RegisterForm(obj=usuario)
+    form.institution_id.choices = [(0, 'Seleccione una institución')] + [(i.id, i.nombre) for i in Institution.query.all()]
+    form.institution_id.data = usuario.institution_id
+    # Establecer el valor seleccionado si es GET
+    print(form.institution_id.data)
+    print(usuario.institution_id)
+    
     if form.validate_on_submit():
-        hashed_pw = generate_password_hash(form.password.data)
-        nuevo_usuario = User(
-            username=form.username.data,
-            name=form.name.data,
-            lastname=form.lastname.data,
-            email=form.email.data,
-            password=hashed_pw
-        )
-        db.session.add(nuevo_usuario)
-        db.session.commit()
-        flash('Usuario registrado exitosamente.', 'success')
-        return redirect(url_for('auth.usuarios'))
+        
+        usuario.username = form.username.data
+        usuario.name = form.name.data
+        usuario.lastname = form.lastname.data
+        usuario.email = form.email.data
+        usuario.institution_id = form.institution_id.data
 
-    return render_template('auth/usuarios.html', form=form, usuarios=usuarios)
-
-@auth_bp.route('/edit_user/<int:user_id>', methods=['GET', 'POST'])
-def edit_user(user_id):
-    user = User.query.get_or_404(user_id)
-    form = RegisterForm(obj=user)
-
-    # Cargar las instituciones disponibles al combo box
-    form.institution_id.choices = [(i.id, i.name) for i in Institution.query.all()]
-
-    if form.validate_on_submit():
-        # Actualizar los campos desde el formulario
-        user.name = form.name.data
-        user.lastname = form.lastname.data
-        user.username = form.username.data
-        user.email = form.email.data
-        user.institution_id = form.institution_id.data
-
-        if form.password.data:  # Solo actualiza si el campo no está vacío
-            user.password = generate_password_hash(form.password.data)
+        #Si el campo de contraseña no está vacío, actualiza
+        if form.password.data:
+            usuario.password = generate_password_hash(form.password.data)
 
         db.session.commit()
-        flash('Usuario actualizado correctamente', 'success')
+        flash('Usuario actualizado.', 'success')
         return redirect(url_for('auth.usuarios'))
-
-    # Cargar valores actuales si GET
-    return render_template('auth/edit_user.html', form=form, user=user)
+    return render_template('auth/register.html', form=form)
