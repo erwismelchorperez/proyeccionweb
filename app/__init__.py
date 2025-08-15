@@ -22,6 +22,9 @@ def create_app():
     from app.institutions.routes import institutions_bp
     app.register_blueprint(institutions_bp)
 
+    from app.balances.routes import balances_bp
+    app.register_blueprint(balances_bp)
+
     @app.route('/')
     def index():
         if current_user.is_authenticated:
