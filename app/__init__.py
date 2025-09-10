@@ -22,6 +22,24 @@ def create_app():
     from app.institutions.routes import institutions_bp
     app.register_blueprint(institutions_bp)
 
+    from app.indicadores.routes import indicadores_bp
+    app.register_blueprint(indicadores_bp)
+
+    from app.pais.routes import pais_bp
+    app.register_blueprint(pais_bp)
+
+    from app.sucursal.routes import sucursal_bp
+    app.register_blueprint(sucursal_bp)
+
+    from app.template_Balance.routes import template_balance_bp
+    app.register_blueprint(template_balance_bp)
+
+    from app.cuentacontable.routes import cuentacontable_bp
+    app.register_blueprint(cuentacontable_bp)
+
+    from app.saldomensual.routes import saldo_mensual_cts_bp
+    app.register_blueprint(saldo_mensual_cts_bp)
+
     @app.route('/')
     def index():
         if current_user.is_authenticated:
