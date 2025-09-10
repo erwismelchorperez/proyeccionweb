@@ -1,0 +1,750 @@
+--
+-- PostgreSQL database dump
+--
+
+-- Dumped from database version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+-- Dumped by pg_dump version 17.5 (Ubuntu 17.5-1.pgdg24.04+1)
+
+SET statement_timeout = 0;
+SET lock_timeout = 0;
+SET idle_in_transaction_session_timeout = 0;
+SET transaction_timeout = 0;
+SET client_encoding = 'UTF8';
+SET standard_conforming_strings = on;
+SELECT pg_catalog.set_config('search_path', '', false);
+SET check_function_bodies = false;
+SET xmloption = content;
+SET client_min_messages = warning;
+SET row_security = off;
+
+--
+-- Name: generarvalidaciones(integer); Type: FUNCTION; Schema: public; Owner: emelchor
+--
+
+CREATE FUNCTION public.generarvalidaciones(p_institucion_id integer) RETURNS void
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    expresion TEXT := '';
+    cuenta TEXT;
+	f record;
+BEGIN
+	delete from validaciones_template where institucion_id = p_institucion_id;
+    for f in
+	    SELECT * from public."templateBalance" where institution_id=p_institucion_id
+	  	loop
+		   	raise notice 'Conectando sucursal % % ',f.codigo,f.nivel;
+		  	select ValidacionesTemplate(p_institucion_id,f.nivel,f.codigo) into expresion;
+			raise notice '      % ', expresion;
+			if length(expresion) <> 0 then 
+				INSERT INTO validaciones_template (
+			        institucion_id, descripcion, cuenta_objetivo, expresion, operador, activo
+			    ) VALUES (
+			        p_institucion_id,
+			        COALESCE(f.cuenta, 'Validación: ' || expresion || ' = ' || f.codigo),
+			        f.codigo,
+			        expresion,
+			        '=',
+			        TRUE);
+			end if;
+		end loop;
+END;
+$$;
+
+
+ALTER FUNCTION public.generarvalidaciones(p_institucion_id integer) OWNER TO emelchor;
+
+--
+-- Name: validacionestemplate(integer, character varying, character varying); Type: FUNCTION; Schema: public; Owner: emelchor
+--
+
+CREATE FUNCTION public.validacionestemplate(p_institucion_id integer, pnivel character varying, pcodigo character varying) RETURNS text
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    expresion TEXT := '';
+    cuenta TEXT;
+	tamanio integer;
+	f record;
+BEGIN
+	expresion := '';
+	if length(pcodigo) = 1 then
+		tamanio := 3;
+	end if;
+	if length(pcodigo) = 3 then
+		tamanio := 5;
+	end if;
+	if length(pcodigo) = 5 then
+		tamanio := 7;
+	end if;
+	if length(pcodigo) = 7 then
+		tamanio := 9;
+	end if;
+	
+	raise notice 'Tamanio %  ',tamanio;
+    for f in
+	    SELECT * from public."templateBalance" where codigo like pcodigo || '%' and length(codigo) = tamanio  and institution_id=p_institucion_id
+	  	loop
+		   raise notice 'Conectando sucursal % % ',f.codigo,f.nivel;
+		   expresion := expresion || ' + ' || f.codigo;
+		end loop;
+	return expresion;
+END;
+$$;
+
+
+ALTER FUNCTION public.validacionestemplate(p_institucion_id integer, pnivel character varying, pcodigo character varying) OWNER TO emelchor;
+
+SET default_tablespace = '';
+
+SET default_table_access_method = heap;
+
+--
+-- Name: cuenta_contable; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public.cuenta_contable (
+    cuentaid integer NOT NULL,
+    templateid integer NOT NULL,
+    nivel integer,
+    tipo character varying(50),
+    codigo character varying(50) NOT NULL,
+    nombre character varying(200) NOT NULL,
+    proyeccion character varying(2),
+    segmento character varying(50)
+);
+
+
+ALTER TABLE public.cuenta_contable OWNER TO emelchor;
+
+--
+-- Name: cuenta_contable_cuentaid_seq; Type: SEQUENCE; Schema: public; Owner: emelchor
+--
+
+CREATE SEQUENCE public.cuenta_contable_cuentaid_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.cuenta_contable_cuentaid_seq OWNER TO emelchor;
+
+--
+-- Name: cuenta_contable_cuentaid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: emelchor
+--
+
+ALTER SEQUENCE public.cuenta_contable_cuentaid_seq OWNED BY public.cuenta_contable.cuentaid;
+
+
+--
+-- Name: indicadores; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public.indicadores (
+    indicadorid integer NOT NULL,
+    institutionid integer,
+    grupoid integer,
+    descripcion text,
+    numerador character varying(150),
+    numeradorctas text,
+    denominador character varying(150),
+    denominadorctas text
+);
+
+
+ALTER TABLE public.indicadores OWNER TO emelchor;
+
+--
+-- Name: indicadores_indicadorid_seq; Type: SEQUENCE; Schema: public; Owner: emelchor
+--
+
+CREATE SEQUENCE public.indicadores_indicadorid_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.indicadores_indicadorid_seq OWNER TO emelchor;
+
+--
+-- Name: indicadores_indicadorid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: emelchor
+--
+
+ALTER SEQUENCE public.indicadores_indicadorid_seq OWNED BY public.indicadores.indicadorid;
+
+
+--
+-- Name: institution; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public.institution (
+    id integer NOT NULL,
+    nombre character varying(150) NOT NULL,
+    descripcion text,
+    fecha_creacion timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.institution OWNER TO emelchor;
+
+--
+-- Name: institution_id_seq; Type: SEQUENCE; Schema: public; Owner: emelchor
+--
+
+CREATE SEQUENCE public.institution_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.institution_id_seq OWNER TO emelchor;
+
+--
+-- Name: institution_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: emelchor
+--
+
+ALTER SEQUENCE public.institution_id_seq OWNED BY public.institution.id;
+
+
+--
+-- Name: modelos; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public.modelos (
+    modelosid integer NOT NULL,
+    institucionid integer,
+    sucursalid integer,
+    codigo character varying(12),
+    modelo character varying(50),
+    ubicacion character varying(50)
+);
+
+
+ALTER TABLE public.modelos OWNER TO emelchor;
+
+--
+-- Name: modelos_modelosid_seq; Type: SEQUENCE; Schema: public; Owner: emelchor
+--
+
+CREATE SEQUENCE public.modelos_modelosid_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.modelos_modelosid_seq OWNER TO emelchor;
+
+--
+-- Name: modelos_modelosid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: emelchor
+--
+
+ALTER SEQUENCE public.modelos_modelosid_seq OWNED BY public.modelos.modelosid;
+
+
+--
+-- Name: pais; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public.pais (
+    clavepais character varying(2) NOT NULL,
+    nombrepais character varying(150)
+);
+
+
+ALTER TABLE public.pais OWNER TO emelchor;
+
+--
+-- Name: predicciones; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public.predicciones (
+    idmodelo integer,
+    idsucursal integer,
+    idinstitucion integer,
+    codigo character varying(12),
+    anio integer,
+    mes integer,
+    prediccion integer
+);
+
+
+ALTER TABLE public.predicciones OWNER TO emelchor;
+
+--
+-- Name: saldo_mensual_cts; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public.saldo_mensual_cts (
+    saldoctsid integer NOT NULL,
+    cuentaid integer NOT NULL,
+    anio integer NOT NULL,
+    mes integer NOT NULL,
+    saldo numeric(18,2)
+);
+
+
+ALTER TABLE public.saldo_mensual_cts OWNER TO emelchor;
+
+--
+-- Name: saldo_mensual_cts_saldoctsid_seq; Type: SEQUENCE; Schema: public; Owner: emelchor
+--
+
+CREATE SEQUENCE public.saldo_mensual_cts_saldoctsid_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.saldo_mensual_cts_saldoctsid_seq OWNER TO emelchor;
+
+--
+-- Name: saldo_mensual_cts_saldoctsid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: emelchor
+--
+
+ALTER SEQUENCE public.saldo_mensual_cts_saldoctsid_seq OWNED BY public.saldo_mensual_cts.saldoctsid;
+
+
+--
+-- Name: sucursal; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public.sucursal (
+    sucursalid integer NOT NULL,
+    institutionid integer,
+    codigo character varying(50),
+    nombre character varying(150)
+);
+
+
+ALTER TABLE public.sucursal OWNER TO emelchor;
+
+--
+-- Name: sucursal_sucursalid_seq; Type: SEQUENCE; Schema: public; Owner: emelchor
+--
+
+CREATE SEQUENCE public.sucursal_sucursalid_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.sucursal_sucursalid_seq OWNER TO emelchor;
+
+--
+-- Name: sucursal_sucursalid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: emelchor
+--
+
+ALTER SEQUENCE public.sucursal_sucursalid_seq OWNED BY public.sucursal.sucursalid;
+
+
+--
+-- Name: templateBalance; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public."templateBalance" (
+    id integer NOT NULL,
+    nivel character varying(50),
+    cuenta character varying(250),
+    codigo character varying(10),
+    proyeccion character varying(2),
+    institution_id integer,
+    sucursalid integer DEFAULT 0,
+    tipo character varying(5),
+    segmento character varying(50)
+);
+
+
+ALTER TABLE public."templateBalance" OWNER TO emelchor;
+
+--
+-- Name: templateBalance_id_seq; Type: SEQUENCE; Schema: public; Owner: emelchor
+--
+
+CREATE SEQUENCE public."templateBalance_id_seq"
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public."templateBalance_id_seq" OWNER TO emelchor;
+
+--
+-- Name: templateBalance_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: emelchor
+--
+
+ALTER SEQUENCE public."templateBalance_id_seq" OWNED BY public."templateBalance".id;
+
+
+--
+-- Name: template_balance; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public.template_balance (
+    templateid integer NOT NULL,
+    sucursalid integer NOT NULL,
+    nombre character varying(200) NOT NULL,
+    descripcion character varying(250),
+    clavepais character varying(2),
+    activo boolean DEFAULT false,
+    created_at timestamp without time zone DEFAULT now()
+);
+
+
+ALTER TABLE public.template_balance OWNER TO emelchor;
+
+--
+-- Name: template_balance_templateid_seq; Type: SEQUENCE; Schema: public; Owner: emelchor
+--
+
+CREATE SEQUENCE public.template_balance_templateid_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.template_balance_templateid_seq OWNER TO emelchor;
+
+--
+-- Name: template_balance_templateid_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: emelchor
+--
+
+ALTER SEQUENCE public.template_balance_templateid_seq OWNED BY public.template_balance.templateid;
+
+
+--
+-- Name: user; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public."user" (
+    id integer NOT NULL,
+    username character varying(64) NOT NULL,
+    email character varying(120) NOT NULL,
+    password character varying(255),
+    name character varying(100),
+    lastname character varying(100),
+    rol character varying(50) DEFAULT ('usuario'::character varying COLLATE "default"),
+    institution_id integer
+);
+
+
+ALTER TABLE public."user" OWNER TO emelchor;
+
+--
+-- Name: user_id_seq; Type: SEQUENCE; Schema: public; Owner: emelchor
+--
+
+CREATE SEQUENCE public.user_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.user_id_seq OWNER TO emelchor;
+
+--
+-- Name: user_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: emelchor
+--
+
+ALTER SEQUENCE public.user_id_seq OWNED BY public."user".id;
+
+
+--
+-- Name: validaciones_template; Type: TABLE; Schema: public; Owner: emelchor
+--
+
+CREATE TABLE public.validaciones_template (
+    id integer NOT NULL,
+    institucion_id integer,
+    descripcion text,
+    cuenta_objetivo text,
+    expresion text,
+    operador text DEFAULT '='::text,
+    activo boolean DEFAULT true
+);
+
+
+ALTER TABLE public.validaciones_template OWNER TO emelchor;
+
+--
+-- Name: validaciones_template_id_seq; Type: SEQUENCE; Schema: public; Owner: emelchor
+--
+
+CREATE SEQUENCE public.validaciones_template_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.validaciones_template_id_seq OWNER TO emelchor;
+
+--
+-- Name: validaciones_template_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: emelchor
+--
+
+ALTER SEQUENCE public.validaciones_template_id_seq OWNED BY public.validaciones_template.id;
+
+
+--
+-- Name: cuenta_contable cuentaid; Type: DEFAULT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.cuenta_contable ALTER COLUMN cuentaid SET DEFAULT nextval('public.cuenta_contable_cuentaid_seq'::regclass);
+
+
+--
+-- Name: indicadores indicadorid; Type: DEFAULT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.indicadores ALTER COLUMN indicadorid SET DEFAULT nextval('public.indicadores_indicadorid_seq'::regclass);
+
+
+--
+-- Name: institution id; Type: DEFAULT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.institution ALTER COLUMN id SET DEFAULT nextval('public.institution_id_seq'::regclass);
+
+
+--
+-- Name: modelos modelosid; Type: DEFAULT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.modelos ALTER COLUMN modelosid SET DEFAULT nextval('public.modelos_modelosid_seq'::regclass);
+
+
+--
+-- Name: saldo_mensual_cts saldoctsid; Type: DEFAULT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.saldo_mensual_cts ALTER COLUMN saldoctsid SET DEFAULT nextval('public.saldo_mensual_cts_saldoctsid_seq'::regclass);
+
+
+--
+-- Name: sucursal sucursalid; Type: DEFAULT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.sucursal ALTER COLUMN sucursalid SET DEFAULT nextval('public.sucursal_sucursalid_seq'::regclass);
+
+
+--
+-- Name: templateBalance id; Type: DEFAULT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public."templateBalance" ALTER COLUMN id SET DEFAULT nextval('public."templateBalance_id_seq"'::regclass);
+
+
+--
+-- Name: template_balance templateid; Type: DEFAULT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.template_balance ALTER COLUMN templateid SET DEFAULT nextval('public.template_balance_templateid_seq'::regclass);
+
+
+--
+-- Name: user id; Type: DEFAULT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public."user" ALTER COLUMN id SET DEFAULT nextval('public.user_id_seq'::regclass);
+
+
+--
+-- Name: validaciones_template id; Type: DEFAULT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.validaciones_template ALTER COLUMN id SET DEFAULT nextval('public.validaciones_template_id_seq'::regclass);
+
+
+--
+-- Name: cuenta_contable cuenta_contable_pkey; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.cuenta_contable
+    ADD CONSTRAINT cuenta_contable_pkey PRIMARY KEY (cuentaid);
+
+
+--
+-- Name: indicadores indicadores_pkey; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.indicadores
+    ADD CONSTRAINT indicadores_pkey PRIMARY KEY (indicadorid);
+
+
+--
+-- Name: institution institution_pkey; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.institution
+    ADD CONSTRAINT institution_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: modelos modelos_pkey; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.modelos
+    ADD CONSTRAINT modelos_pkey PRIMARY KEY (modelosid);
+
+
+--
+-- Name: pais pais_pkey; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.pais
+    ADD CONSTRAINT pais_pkey PRIMARY KEY (clavepais);
+
+
+--
+-- Name: saldo_mensual_cts saldo_mensual_cts_pkey; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.saldo_mensual_cts
+    ADD CONSTRAINT saldo_mensual_cts_pkey PRIMARY KEY (saldoctsid);
+
+
+--
+-- Name: sucursal sucursal_pkey; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.sucursal
+    ADD CONSTRAINT sucursal_pkey PRIMARY KEY (sucursalid);
+
+
+--
+-- Name: templateBalance templateBalance_pkey; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public."templateBalance"
+    ADD CONSTRAINT "templateBalance_pkey" PRIMARY KEY (id);
+
+
+--
+-- Name: template_balance template_balance_pkey; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.template_balance
+    ADD CONSTRAINT template_balance_pkey PRIMARY KEY (templateid);
+
+
+--
+-- Name: user user_email_key; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public."user"
+    ADD CONSTRAINT user_email_key UNIQUE (email);
+
+
+--
+-- Name: user user_pkey; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public."user"
+    ADD CONSTRAINT user_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: user user_username_key; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public."user"
+    ADD CONSTRAINT user_username_key UNIQUE (username);
+
+
+--
+-- Name: validaciones_template validaciones_template_pkey; Type: CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.validaciones_template
+    ADD CONSTRAINT validaciones_template_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: templateBalance Forenkey_BalanceInstitution; Type: FK CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public."templateBalance"
+    ADD CONSTRAINT "Forenkey_BalanceInstitution" FOREIGN KEY (institution_id) REFERENCES public.institution(id);
+
+
+--
+-- Name: cuenta_contable cuenta_contable_templateid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.cuenta_contable
+    ADD CONSTRAINT cuenta_contable_templateid_fkey FOREIGN KEY (templateid) REFERENCES public.template_balance(templateid);
+
+
+--
+-- Name: user fk_institucion; Type: FK CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public."user"
+    ADD CONSTRAINT fk_institucion FOREIGN KEY (institution_id) REFERENCES public.institution(id) ON DELETE CASCADE;
+
+
+--
+-- Name: sucursal fk_sucursal_institucion; Type: FK CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.sucursal
+    ADD CONSTRAINT fk_sucursal_institucion FOREIGN KEY (institutionid) REFERENCES public.institution(id) ON UPDATE CASCADE ON DELETE CASCADE;
+
+
+--
+-- Name: saldo_mensual_cts saldo_mensual_cts_cuentaid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.saldo_mensual_cts
+    ADD CONSTRAINT saldo_mensual_cts_cuentaid_fkey FOREIGN KEY (cuentaid) REFERENCES public.cuenta_contable(cuentaid);
+
+
+--
+-- Name: template_balance template_balance_clavepais_fkey; Type: FK CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.template_balance
+    ADD CONSTRAINT template_balance_clavepais_fkey FOREIGN KEY (clavepais) REFERENCES public.pais(clavepais);
+
+
+--
+-- Name: template_balance template_balance_sucursalid_fkey; Type: FK CONSTRAINT; Schema: public; Owner: emelchor
+--
+
+ALTER TABLE ONLY public.template_balance
+    ADD CONSTRAINT template_balance_sucursalid_fkey FOREIGN KEY (sucursalid) REFERENCES public.sucursal(sucursalid);
+
+
+--
+-- PostgreSQL database dump complete
+--
+
