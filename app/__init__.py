@@ -40,6 +40,10 @@ def create_app():
     from app.saldomensual.routes import saldo_mensual_cts_bp
     app.register_blueprint(saldo_mensual_cts_bp)
 
+    from app.balances.routes import balances_bp
+    app.register_blueprint(balances_bp)
+
+
     @app.route('/')
     def index():
         if current_user.is_authenticated:

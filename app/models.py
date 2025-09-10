@@ -143,3 +143,28 @@ class SaldoMensualCTS(db.Model):
         return f"<SaldoMensualCTS {self.anio}-{self.mes} cuenta={self.cuentaid}>"
 
 
+
+class BalanceMensual(db.Model):
+    __tablename__ = 'balancemensual'
+
+    id = db.Column(db.BigInteger, primary_key=True, autoincrement=True)
+    institucion_id = db.Column(db.Integer, db.ForeignKey('institution.id'), nullable=False)
+    usuario_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    anio = db.Column(db.Integer, nullable=False)
+    mes = db.Column(db.SmallInteger, nullable=False)  # SMALLINT se adapta a TINYINT
+    nivel = db.Column(db.String(50))
+    cuenta = db.Column(db.String(250))
+    codigo = db.Column(db.String(10))
+    saldo = db.Column(db.Numeric(10, 2))
+
+    __table_args__ = (
+        db.UniqueConstraint('institucion_id', 'anio', 'mes', name='uk_institucion_mes'),
+    )
+
+    # Relaciones opcionales
+    institucion = db.relationship('Institution', backref=db.backref('balances_mensuales', lazy=True))
+    usuario = db.relationship('User', backref=db.backref('balances_mensuales', lazy=True))
+
+    def __repr__(self):
+        return f"<BalanceMensual {self.anio}-{self.mes} Inst:{self.institucion_id} Saldo:{self.saldo}>"
+
