@@ -13,7 +13,7 @@ def api_lista_paises():
     return jsonify([
         {
             "clavepais": pais.clavepais,
-            "nombrepais": pais.nombrepais
+            "nombre": pais.nombre
         }
         for pais in countries
     ])
