@@ -40,6 +40,42 @@ def create_app():
     from app.saldomensual.routes import saldo_mensual_cts_bp
     app.register_blueprint(saldo_mensual_cts_bp)
 
+    from app.periodos.routes import periodo_bp
+    app.register_blueprint(periodo_bp)
+
+    from app.sucursaltemplate.routes import sucursal_template_bp
+    app.register_blueprint(sucursal_template_bp)
+
+    from app.tipocuenta.routes import tipocuenta_bp
+    app.register_blueprint(tipocuenta_bp)
+
+    from app.variables.routes import variables_bp
+    app.register_blueprint(variables_bp)
+
+    from app.valorvariable.routes import valorvariable_bp
+    app.register_blueprint(valorvariable_bp)
+
+    from app.tempvar.routes import tempvar_bp
+    app.register_blueprint(tempvar_bp)
+
+    from app.grupo.routes import grupo_bp
+    app.register_blueprint(grupo_bp)
+
+    from app.indicador.routes import indicador_bp
+    app.register_blueprint(indicador_bp)
+
+    from app.tempind.routes import tempind_bp
+    app.register_blueprint(tempind_bp)
+
+    from app.valorindicador.routes import valorindicador_bp
+    app.register_blueprint(valorindicador_bp)
+
+    from app.modelos.routes import modelos_bp
+    app.register_blueprint(modelos_bp)
+
+    from app.prediccion.routes import predicciones_bp
+    app.register_blueprint(predicciones_bp)
+
     from app.balances.routes import balances_bp
     app.register_blueprint(balances_bp)
 

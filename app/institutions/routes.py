@@ -133,7 +133,7 @@ def CrearInstitucion():
 
     # Devolver el objeto creado como JSON
     return jsonify({
-        "id": nueva_inst.id,
+        "institutionid": nueva_inst.institutionid,
         "nombre": nueva_inst.nombre,
         "descripcion": nueva_inst.descripcion,
         "fecha_creacion": nueva_inst.fecha_creacion.isoformat() if nueva_inst.fecha_creacion else None

@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import CuentaContable
+from app.models import CuentaContable, TipoCuenta
 
 cuentacontable_bp = Blueprint('cuentacontable_bp', __name__)
 
@@ -18,16 +18,53 @@ def api_crear_cuentas():
     templateid = data["templateid"]
     cuentas = data["cuentas"]
 
+    # ---------------------------
+    # 1️⃣ Validar todos los datos
+    # ---------------------------
+    errores = []
+    cuentas_validadas = []
+
+    for idx, c in enumerate(cuentas, start=1):
+        clave_tipo = c.get("tipocuenta")
+        if not clave_tipo:
+            errores.append(f"Cuenta {idx}: falta la clave 'tipocuenta'")
+            continue
+
+        tipo = TipoCuenta.query.filter_by(clavetipo=clave_tipo).first()
+        if not tipo:
+            errores.append(f"Cuenta {idx}: tipo de cuenta '{clave_tipo}' no existe")
+            continue
+
+        # Guardar los datos validados en memoria
+        cuentas_validadas.append({
+            "nivel": c.get("nivel"),
+            "tipoid": tipo.tipocuentaid,
+            "codigo": c.get("codigo"),
+            "nombre": c.get("nombre"),
+            "proyeccion": c.get("proyeccion"),
+            "segmento": c.get("segmento")
+        })
+
+    # Si hay errores, no se inserta nada
+    if errores:
+        return jsonify({
+            "error": "Validación fallida. No se insertó ninguna cuenta.",
+            "detalles": errores
+        }), 400
+    print(cuentas_validadas)
+    # ---------------------------
+    # 2️⃣ Insertar en una sola transacción
+    # ---------------------------
     nuevas_cuentas = []
-    for c in cuentas:
+    for c in cuentas_validadas:
         cuenta = CuentaContable(
             templateid=templateid,
-            nivel=c.get("nivel"),
-            tipo=c.get("tipo"),
-            codigo=c.get("codigo"),
-            nombre=c.get("nombre"),
-            proyeccion=c.get("proyeccion"),
-            segmento=c.get("segmento")
+            nivel=c["nivel"],
+            tipoid=c["tipoid"],
+            codigo=c["codigo"],
+            nombre=c["nombre"],
+            proyeccion=c["proyeccion"],
+            segmento=c["segmento"]
         )
         db.session.add(cuenta)
         nuevas_cuentas.append(cuenta)
@@ -35,13 +72,14 @@ def api_crear_cuentas():
     db.session.commit()
 
     return jsonify({
-        "message": "Cuentas creadas exitosamente",
+        "message": "Todas las cuentas fueron creadas exitosamente",
         "cuentas": [
             {
                 "cuentaid": c.cuentaid,
                 "templateid": c.templateid,
                 "codigo": c.codigo,
-                "nombre": c.nombre
+                "nombre": c.nombre,
+                "tipoid": c.tipoid
             } for c in nuevas_cuentas
         ]
     }), 201
@@ -58,7 +96,7 @@ def api_update_cuenta():
 
     # Actualizar campos
     cuenta.nivel = data.get("nivel", cuenta.nivel)
-    cuenta.tipo = data.get("tipo", cuenta.tipo)
+    cuenta.tipoid = data.get("tipo", cuenta.tipoid)
     cuenta.codigo = data.get("codigo", cuenta.codigo)
     cuenta.nombre = data.get("nombre", cuenta.nombre)
     cuenta.proyeccion = data.get("proyeccion", cuenta.proyeccion)
@@ -81,7 +119,7 @@ def api_list_cuentas():
             "cuentaid": c.cuentaid,
             "templateid": c.templateid,
             "nivel": c.nivel,
-            "tipo": c.tipo,
+            "tipoid": c.tipoid,
             "codigo": c.codigo,
             "nombre": c.nombre,
             "proyeccion": c.proyeccion,

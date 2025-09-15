@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import SaldoMensualCTS, Template_Balance, CuentaContable
+from app.models import SaldoMensualCTS, Template_Balance, CuentaContable, Periodo
 
 saldo_mensual_cts_bp = Blueprint('saldo_mensual_cts_bp', __name__)
 
@@ -12,53 +12,64 @@ saldo_mensual_cts_bp = Blueprint('saldo_mensual_cts_bp', __name__)
 def api_crear_saldos():
     data = request.get_json()
 
-    # Validar entrada mínima
-    if not data or "institutionid" not in data or "sucursalid" not in data or "saldos" not in data:
-        return jsonify({"error": "institutionid, sucursalid y saldos son requeridos"}), 400
+    # Validar campos mínimos
+    if not data or not all(k in data for k in ("institutionid", "sucursalid", "anio", "mes", "saldos")):
+        return jsonify({"error": "institutionid, sucursalid, anio, mes y saldos son requeridos"}), 400
 
-    institutionid = data["institutionid"]
     sucursalid = data["sucursalid"]
-    saldos = data["saldos"]
+    anio       = data["anio"]
+    mes        = data["mes"]
+    saldos     = data["saldos"]
 
-    # 1. Buscar template activo de esa sucursal
-    template = Template_Balance.query.filter_by(
-        sucursalid=sucursalid,
-        activo=True
-    ).first()
+    # 1️⃣ Verificar que el periodo exista
+    periodo = Periodo.query.filter_by(anio=anio, mes=mes).first()
+    if not periodo:
+        return jsonify({"error": f"No existe un periodo registrado para {anio}-{mes}"}), 400
 
+    # 2️⃣ Template activo de la sucursal
+    template = Template_Balance.query.filter_by(sucursalid=sucursalid, activo=True).first()
     if not template:
         return jsonify({"error": "No existe template activo para esta sucursal"}), 400
 
-    # 2. Obtener todas las cuentas de ese template
-    cuentas_validas = {c.cuentaid for c in CuentaContable.query.filter_by(templateid=template.templateid).all()}
-
-    if not cuentas_validas:
+    # 3️⃣ Cuentas válidas del template
+    cuentas = CuentaContable.query.filter_by(templateid=template.templateid).all()
+    cuentas_dict = {c.codigo: c for c in cuentas}
+    if not cuentas_dict:
         return jsonify({"error": "El template activo no tiene cuentas contables"}), 400
 
-    # 3. Insertar los saldos validados
     registros_insertados = []
-    for saldo in saldos:
-        cuentaid = saldo.get("cuentaid")
-        anio = saldo.get("anio")
-        mes = saldo.get("mes")
-        monto = saldo.get("saldo")
 
-        # Validación de cuenta existente dentro del template
-        if cuentaid not in cuentas_validas:
-            return jsonify({"error": f"La cuentaid {cuentaid} no pertenece al template activo"}), 400
+    # 4️⃣ Procesar cada saldo
+    for item in saldos:
+        codigo = item.get("codigo")
+        nombre = item.get("nombre")
+        monto  = item.get("saldo")
 
+        if not codigo or monto is None:
+            return jsonify({"error": "Cada saldo debe incluir 'codigo' y 'saldo'"}), 400
+
+        cuenta = cuentas_dict.get(codigo)
+        if not cuenta:
+            return jsonify({"error": f"La cuenta con código {codigo} no pertenece al template activo"}), 400
+
+        # Validar nombre opcional
+        if nombre and cuenta.nombre != nombre:
+            return jsonify({"error": f"El nombre '{nombre}' no coincide con la cuenta '{cuenta.nombre}'"}), 400
+
+        # ✅ Insertar usando el ID del periodo
         nuevo_saldo = SaldoMensualCTS(
-            cuentaid=cuentaid,
-            anio=anio,
-            mes=mes,
+            cuentaid=cuenta.cuentaid,
+            periodoid=periodo.periodoid,   # <<-- aquí
             saldo=monto
         )
         db.session.add(nuevo_saldo)
+
         registros_insertados.append({
-            "cuentaid": cuentaid,
-            "anio": anio,
-            "mes": mes,
-            "saldo": monto
+            "codigo": codigo,
+            "cuentaid": cuenta.cuentaid,
+            "nombre": cuenta.nombre,
+            "periodoid": periodo.periodoid,
+            "saldo": float(monto)
         })
 
     db.session.commit()
@@ -66,6 +77,6 @@ def api_crear_saldos():
     return jsonify({
         "message": "Saldos cargados exitosamente",
         "templateid": template.templateid,
-        "sucursalid": sucursalid,
+        "periodoid": periodo.periodoid,
         "registros": registros_insertados
     }), 201
