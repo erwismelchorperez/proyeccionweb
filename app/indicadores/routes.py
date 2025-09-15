@@ -4,10 +4,10 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import Institution, Indicador, TemplateBalance
+from app.models import Institution, Indicadores, TemplateBalance
 from .forms import IndicadorForm
 
-indicadores_bp = Blueprint('indicador', __name__, template_folder='templates')
+indicadores_bp = Blueprint('indicadores', __name__, template_folder='templates')
 
 @indicadores_bp.route('/indicadores/crear', methods=['GET', 'POST'])
 def crear_indicador():
@@ -16,7 +16,7 @@ def crear_indicador():
     form.institutionid.choices = [(i.id, i.nombre) for i in Institution.query.all()]
 
     if form.validate_on_submit():
-        indicador = Indicador(
+        indicador = Indicadores(
             institutionid=form.institutionid.data,
             grupoid=form.grupoid.data,
             descripcion=form.descripcion.data,
@@ -39,7 +39,7 @@ def api_crear_indicador():
     if not data or "institutionid" not in data:
         return jsonify({"error": "institutionid es requerido"}), 400
 
-    indicador = Indicador(
+    indicador = Indicadores(
         institutionid=data.get("institutionid"),
         grupoid=data.get("grupoid"),
         descripcion=data.get("descripcion"),
@@ -67,7 +67,7 @@ def api_crear_indicador():
     }), 201
 @indicadores_bp.route('/api/Listindicadores', methods=['GET'])
 def api_lista_indicadores():
-    indicadores = Indicador.query.all()
+    indicadores = Indicadores.query.all()
     return jsonify([
         {
             "id": ind.indicadorid,
@@ -88,7 +88,7 @@ def editar_indicador_json():
     if not data or "id" not in data:
         return jsonify({"error": "Se requiere el campo 'id' en el JSON"}), 400
 
-    indicador = Indicador.query.get(data["id"])
+    indicador = Indicadores.query.get(data["id"])
     if not indicador:
         return jsonify({"error": f"Indicador con id {data['id']} no existe"}), 404
 
@@ -130,7 +130,7 @@ def eliminar_indicador_json():
     if not data or "id" not in data:
         return jsonify({"error": "Se requiere el campo 'id' en el JSON"}), 400
 
-    indicador = Indicador.query.get(data["id"])
+    indicador = Indicadores.query.get(data["id"])
     if not indicador:
         return jsonify({"error": f"Indicador con id {data['id']} no existe"}), 404
 

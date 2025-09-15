@@ -13,19 +13,12 @@ template_balance_bp = Blueprint('template_balance_bp', __name__)
 def api_crear_template():
     data = request.get_json()
 
-    if not data or "sucursalid" not in data or "nombre" not in data:
-        return jsonify({"error": "sucursalid y nombre son requeridos"}), 400
-
-    # Si este template se marca como activo, desactivar los demás de la misma sucursal
-    if data.get("activo", False):
-        Template_Balance.query.filter_by(sucursalid=data["sucursalid"], activo=True).update({"activo": False})
+    if not data or "nombre" not in data:
+        return jsonify({"error": "nombre datos son requeridos"}), 400
 
     template = Template_Balance(
-        sucursalid=data["sucursalid"],
         nombre=data["nombre"],
-        descripcion=data.get("descripcion"),
-        clavepais=data.get("clavepais"),
-        activo=data.get("activo", False)
+        descripcion=data.get("descripcion")
     )
 
     db.session.add(template)
@@ -35,15 +28,15 @@ def api_crear_template():
         "message": "Template creado exitosamente",
         "template": {
             "templateid": template.templateid,
-            "sucursalid": template.sucursalid,
             "nombre": template.nombre,
-            "activo": template.activo
+            "descripcion": template.descripcion,
+            "created_at": template.created_at
         }
     }), 201
 
 
 # 📌 Actualizar un template balance
-@template_balance_bp.route('/api/Updatetemplate', methods=['PUT'])
+@template_balance_bp.route('/api/Updatetemplate', methods=['POST'])
 def api_update_template():
     data = request.get_json()
 
@@ -57,17 +50,7 @@ def api_update_template():
     # Actualizar valores
     template.nombre = data.get("nombre", template.nombre)
     template.descripcion = data.get("descripcion", template.descripcion)
-    template.clavepais = data.get("clavepais", template.clavepais)
-
-    # Si se marca como activo, desactivar otros de la misma sucursal
-    if data.get("activo") is not None:
-        if data["activo"]:
-            Template_Balance.query.filter(
-                Template_Balance.sucursalid == template.sucursalid,
-                Template_Balance.templateid != template.templateid,
-                Template_Balance.activo == True
-            ).update({"activo": False})
-        template.activo = data["activo"]
+    #template.clavepais = data.get("clavepais", template.clavepais)
 
     db.session.commit()
 
@@ -75,9 +58,9 @@ def api_update_template():
         "message": "Template actualizado exitosamente",
         "template": {
             "templateid": template.templateid,
-            "sucursalid": template.sucursalid,
             "nombre": template.nombre,
-            "activo": template.activo
+            "descripcion":template.descripcion,
+            "created_at": template.created_at
         }
     })
 
@@ -85,20 +68,13 @@ def api_update_template():
 # 📌 Listar todos los templates de una sucursal
 @template_balance_bp.route('/api/Listtemplates', methods=['POST'])
 def api_list_templates():
-    data = request.get_json()
-    if not data or "sucursalid" not in data:
-        return jsonify({"error": "sucursalid es requerido"}), 400
-
-    templates = Template_Balance.query.filter_by(sucursalid=data["sucursalid"]).all()
+    templates = Template_Balance.query.all()
 
     return jsonify([
         {
             "templateid": t.templateid,
-            "sucursalid": t.sucursalid,
             "nombre": t.nombre,
             "descripcion": t.descripcion,
-            "clavepais": t.clavepais,
-            "activo": t.activo,
             "created_at": t.created_at
         }
         for t in templates
