@@ -137,6 +137,7 @@ class TempInd(db.Model):
     __tablename__ = 'tempind'
     indicadorid = db.Column(db.Integer, db.ForeignKey('indicador.indicadorid'),primary_key=True)
     templateid = db.Column(db.Integer, db.ForeignKey('template_balance.templateid'), primary_key=True)
+    formula = db.Column(JSONB)  # <-- Columna para guardar JSON
 
     def __repr__(self):
         return f"<TempVar templateid={self.templateid}, templateid={self.templateid}>"
@@ -161,6 +162,7 @@ class Modelo(db.Model):
     cuentaid = db.Column(db.Integer, db.ForeignKey('cuenta_contable.cuentaid'), nullable=False)
     modelo = db.Column(db.String(100))
     ubicacion = db.Column(db.String(250))
+    variables = db.Column(JSONB)  # <-- Columna para guardar JSON
 
     cuenta = db.relationship('CuentaContable', backref=db.backref('modelos', lazy=True))
 
