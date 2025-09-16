@@ -73,6 +73,7 @@ def listar_tempind():
     return jsonify([
         {
             "indicadorid": r.indicadorid,
-            "templateid": r.templateid
+            "templateid": r.templateid,
+            "formula": r.formula
         } for r in registros
     ])

@@ -58,6 +58,7 @@ def listar_modelos():
             "modeloid": m.modeloid,
             "cuentaid": m.cuentaid,
             "modelo": m.modelo,
-            "ubicacion": m.ubicacion
+            "ubicacion": m.ubicacion,
+            "variables":m.variables
         } for m in modelos
     ])
