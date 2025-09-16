@@ -17,11 +17,13 @@ def crear_tempind():
     {
         "indicadorid": 1,
         "templateid": 1
+        "formula": {}
     }
     """
     data = request.get_json()
     indicadorid = data.get("indicadorid")
     templateid = data.get("templateid")
+    formula = data.get('formula')  # Espera JSON
 
     if not indicadorid or not templateid:
         return jsonify({"error": "indicadorid y variableid son requeridos"}), 400
@@ -38,14 +40,15 @@ def crear_tempind():
         return jsonify({"error": "La relación ya existe"}), 400
 
     # Crear registro
-    registro = TempInd(indicadorid=indicadorid, templateid=templateid)
+    registro = TempInd(indicadorid=indicadorid, templateid=templateid, formula = formula)
     db.session.add(registro)
     db.session.commit()
 
     return jsonify({
         "message": "Relación indicador-variable creada",
         "indicadorid": registro.indicadorid,
-        "templateid": registro.templateid
+        "templateid": registro.templateid,
+        "formula": registro.formula
     }), 201
 
 
