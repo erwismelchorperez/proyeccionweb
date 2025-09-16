@@ -15,6 +15,7 @@ def crear_modelo():
     cuentaid = data.get('cuentaid')
     modelo_nombre = data.get('modelo')
     ubicacion = data.get('ubicacion')
+    variables = data.get('variables')  # <-- aquí capturamos el JSON
 
     if not cuentaid:
         return jsonify({"error": "cuentaid es requerido"}), 400
@@ -23,8 +24,14 @@ def crear_modelo():
     cuenta = CuentaContable.query.get(cuentaid)
     if not cuenta:
         return jsonify({"error": "Cuenta contable no existe"}), 404
+    
+    # Validar que variables (si viene) sea dict o list
+    if variables is not None and not isinstance(variables, (dict, list)):
+        return jsonify({
+            "error": "El campo 'variables' debe ser un objeto JSON o una lista de objetos"
+        }), 400
 
-    nuevo_modelo = Modelo(cuentaid=cuentaid, modelo=modelo_nombre, ubicacion=ubicacion)
+    nuevo_modelo = Modelo(cuentaid=cuentaid, modelo=modelo_nombre, ubicacion=ubicacion, variables= variables)
     db.session.add(nuevo_modelo)
     db.session.commit()
 
@@ -33,7 +40,8 @@ def crear_modelo():
         "modeloid": nuevo_modelo.modeloid,
         "cuentaid": nuevo_modelo.cuentaid,
         "modelo": nuevo_modelo.modelo,
-        "ubicacion": nuevo_modelo.ubicacion
+        "ubicacion": nuevo_modelo.ubicacion,
+        "variables": variables
     }), 201
 @modelos_bp.route('/api/modelos/list', methods=['POST'])
 def listar_modelos():

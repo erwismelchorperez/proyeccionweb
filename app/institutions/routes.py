@@ -108,7 +108,7 @@ def listarInstituciones():
     result = []
     for inst in instituciones:
         result.append({
-            "id": inst.id,
+            "id": inst.institutionid,
             "nombre": inst.nombre,
             "descripcion": inst.descripcion,
             "fecha_creacion": inst.fecha_creacion.isoformat() if inst.fecha_creacion else None
