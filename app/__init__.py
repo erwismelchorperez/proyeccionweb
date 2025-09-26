@@ -76,6 +76,12 @@ def create_app():
     from app.prediccion.routes import predicciones_bp
     app.register_blueprint(predicciones_bp)
 
+    from app.escenarios.routes import escenario_bp
+    app.register_blueprint(escenario_bp)
+
+    from app.escenariocuenta.routes import escenariocuenta_bp
+    app.register_blueprint(escenariocuenta_bp)
+
     from app.balances.routes import balances_bp
     app.register_blueprint(balances_bp)
 
