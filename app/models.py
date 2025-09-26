@@ -217,6 +217,31 @@ class Grupo(db.Model):
 
     def __repr__(self):
         return f"<Grupo {self.nombre}>"
+class Escenario(db.Model):
+    __tablename__ = 'escenario'
+
+    escenarioid = db.Column(db.Integer, primary_key=True)
+    nombre = db.Column(db.String(100), nullable=False)
+    tipo = db.Column(db.String(50), nullable=False)
+    description = db.Column(db.Text)
+    elaboracion = db.Column(db.DateTime, server_default=db.func.now())
+    inicio = db.Column(db.JSON, nullable=False)
+    fin = db.Column(db.JSON, nullable=False)
+
+    def __repr__(self):
+        return f"<Escenario {self.escenarioid} - {self.nombre}>"
+class EscenarioCuenta(db.Model):
+    __tablename__ = 'escenarioscuenta'
+
+    cuentaid = db.Column(db.Integer,db.ForeignKey('cuenta_contable.cuentaid', ondelete='CASCADE'),primary_key=True)
+    escenarioid = db.Column(db.Integer,db.ForeignKey('escenario.escenarioid', ondelete='CASCADE'),primary_key=True)
+
+    # Relaciones opcionales (si tienes los modelos definidos)
+    cuenta = db.relationship('CuentaContable', backref='escenarios_asociados')
+    escenario = db.relationship('Escenario', backref='cuentas_asociadas')
+
+    def __repr__(self):
+        return f"<EscenarioCuenta cuentaid={self.cuentaid}, escenarioid={self.escenarioid}>"
 """
     Apartado superior
     Primera parte del proyecto
