@@ -82,6 +82,9 @@ def create_app():
     from app.escenariocuenta.routes import escenariocuenta_bp
     app.register_blueprint(escenariocuenta_bp)
 
+    from app.semaforo.routes import semaforo_bp
+    app.register_blueprint(semaforo_bp)
+
     from app.balances.routes import balances_bp
     app.register_blueprint(balances_bp)
 

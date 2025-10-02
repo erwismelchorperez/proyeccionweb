@@ -59,16 +59,37 @@ def crear_indicador():
         "indicador": indicador.indicador
     }), 201
 # Listar indicadores
-@indicador_bp.route('/api/indicador/list', methods=['GET'])
+@indicador_bp.route('/api/indicador/list', methods=['POST'])
 def listar_indicadores():
-    indicadores = Indicador.query.all()
-    return jsonify([
-        {
-            "indicadorid": i.indicadorid,
-            "grupoid": i.grupoid,
-            "clavepais": i.clavepais,
-            "indicador": i.indicador,
-            "descripcion": i.descripcion,
-            "formula": i.formula
-        } for i in indicadores
-    ])
+    data = request.json or {}
+    indicadorid = data.get('indicadorid')
+
+    if indicadorid:
+        indicador = Indicador.query.get(indicadorid)
+        if not indicador:
+            return jsonify({"error": f"No se encontró el indicador con id {indicadorid}"}), 404
+        # Retorna un solo objeto
+        result = {
+            "indicadorid": indicador.indicadorid,
+            "grupoid": indicador.grupoid,
+            "clavepais": indicador.clavepais,
+            "indicador": indicador.indicador,
+            "descripcion": indicador.descripcion,
+            "formula": indicador.formula
+        }
+        return jsonify(result), 200
+
+    else:
+        # Retorna todos
+        indicadores = Indicador.query.all()
+        result = [
+            {
+                "indicadorid": i.indicadorid,
+                "grupoid": i.grupoid,
+                "clavepais": i.clavepais,
+                "indicador": i.indicador,
+                "descripcion": i.descripcion,
+                "formula": i.formula
+            } for i in indicadores
+        ]
+        return jsonify(result), 200
