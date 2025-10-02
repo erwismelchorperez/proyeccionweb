@@ -180,6 +180,18 @@ class Prediccion(db.Model):
 
     def __repr__(self):
         return f"<Prediccion {self.prediccionid} - Modelo {self.modeloid} - Periodo {self.periodoid}>"
+class Semaforo(db.Model):
+    __tablename__ = 'semaforo'
+    semaforoid = db.Column(db.Integer, primary_key=True)
+    indicadorid = db.Column(db.Integer, db.ForeignKey('indicador.indicadorid'), nullable=False)
+    nombre = db.Column(db.String(50), nullable=False)
+    color = db.Column(db.String(1), nullable=False)
+    operador1 = db.Column(db.String(2), nullable=False)
+    valor1 = db.Column(db.Numeric(10,2), nullable=False)
+    operador2 = db.Column(db.String(50), nullable=True)
+    valor2 = db.Column(db.Numeric(10,2), nullable=True)
+    limiteinf = db.Column(db.Numeric(10,2), nullable=False)
+    limitesup = db.Column(db.Numeric(10,2), nullable=False)
 """
     Apartado de catálogos
         Periodo
