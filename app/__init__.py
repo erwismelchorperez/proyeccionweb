@@ -3,13 +3,24 @@ from config import Config
 from .models import db, User
 from flask_login import LoginManager
 from flask_login import current_user
+from flask_cors import CORS
 
 login_manager = LoginManager()
 
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
-
+    #CORS
+    CORS(
+     app,
+     resources={r"/api/*":{"origins":[
+      "http://localhost:4200",
+      "http://127.0.0.1:4200"
+     ]}},
+     supports_credentials=True,
+     methods=["GET","POST","PUT","DELETE","OPTIONS"],
+     allow_headers=["Content-Type","Authorization","X-Requested-With"]
+    )
     # Inicializar base de datos y login manager
     db.init_app(app)
     login_manager.init_app(app)

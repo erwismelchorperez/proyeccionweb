@@ -66,7 +66,7 @@ def api_update_template():
 
 
 # 📌 Listar todos los templates de una sucursal
-@template_balance_bp.route('/api/Listtemplates', methods=['POST'])
+@template_balance_bp.route('/api/Listtemplates', methods=['GET','POST'])
 def api_list_templates():
     templates = Template_Balance.query.all()
 
