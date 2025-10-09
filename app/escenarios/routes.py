@@ -52,8 +52,8 @@ def list_escenarios():
     ])
 
 # Cargar el modelo .pkl una sola vez
-MODEL_PATH = os.path.join("modelos", "/root/proyecciones/ProyeccionFinanciera/instituciones/institucion_1/sucursal_0/101/RidgePSO_3_101.pkl")
-best_model = joblib.load(MODEL_PATH)
+#MODEL_PATH = os.path.join("modelos", "/root/proyecciones/ProyeccionFinanciera/instituciones/institucion_1/sucursal_0/101/RidgePSO_3_101.pkl")
+#best_model = joblib.load(MODEL_PATH)
 @escenario_bp.route("/api/escenario/prediccion", methods=["POST"])
 def api_validate_escenario():
     """
