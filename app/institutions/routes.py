@@ -100,11 +100,18 @@ def subirtemplate(id):
 """
     Apartado que regresará todo lo de postman en fomrato JSON
 """
-@institutions_bp.route('/institucionesListar')
+@institutions_bp.route('/institucionesListar', methods=['POST'])
 def listarInstituciones():
-    instituciones = Institution.query.all()
-    
-    # Convertir cada objeto a diccionario
+    data = request.get_json(silent=True) or {}
+    institution_id = data.get('institutionid')
+
+    # Si se pasa institutionid → filtra
+    if institution_id:
+        instituciones = Institution.query.filter_by(institutionid=institution_id).all()
+    else:
+        # Si no se pasa → devuelve todas
+        instituciones = Institution.query.all()
+
     result = []
     for inst in instituciones:
         result.append({

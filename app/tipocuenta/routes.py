@@ -7,26 +7,49 @@ tipocuenta_bp = Blueprint('tipocuenta', __name__, template_folder='templates')
 @tipocuenta_bp.route('/api/tipocuenta/create', methods=['POST'])
 def create_tipocuenta():
     data = request.get_json()
-    clavetipo = data.get('clavetipo')
-    nombre = data.get('nombre')
 
-    if not nombre:
-        return jsonify({"error": "El campo 'nombre' es requerido"}), 400
+    # Si el usuario envía un solo objeto, lo convertimos a lista
+    if isinstance(data, dict):
+        data = [data]
+    elif not isinstance(data, list):
+        return jsonify({"error": "El cuerpo de la solicitud debe ser un objeto o una lista de objetos"}), 400
 
-    # Validar que el nombre sea único
-    if TipoCuenta.query.filter_by(nombre=nombre).first():
-        return jsonify({"error": "Ya existe un tipo de cuenta con ese nombre"}), 400
+    created = []
+    errors = []
 
-    nuevo = TipoCuenta(clavetipo=clavetipo, nombre=nombre)
-    db.session.add(nuevo)
-    db.session.commit()
+    for item in data:
+        clavetipo = item.get('clavetipo')
+        nombre = item.get('nombre')
+
+        # Validaciones
+        if not nombre:
+            errors.append({"item": item, "error": "El campo 'nombre' es requerido"})
+            continue
+
+        if TipoCuenta.query.filter_by(nombre=nombre).first():
+            errors.append({"item": item, "error": "Ya existe un tipo de cuenta con ese nombre"})
+            continue
+
+        nuevo = TipoCuenta(clavetipo=clavetipo, nombre=nombre)
+        db.session.add(nuevo)
+        created.append(nuevo)
+
+    # Solo hacemos commit si hay algo que crear
+    if created:
+        db.session.commit()
 
     return jsonify({
-        "message": "Tipo de cuenta creado exitosamente",
-        "tipocuentaid": nuevo.tipocuentaid,
-        "clavetipo": nuevo.clavetipo,
-        "nombre": nuevo.nombre
-    }), 201
+        "message": f"Se crearon {len(created)} tipo(s) de cuenta exitosamente",
+        "creados": [
+            {
+                "tipocuentaid": tc.tipocuentaid,
+                "clavetipo": tc.clavetipo,
+                "nombre": tc.nombre
+            }
+            for tc in created
+        ],
+        "errores": errors
+    }), 201 if created else 400
 # Listar todos los tipos de cuenta
 @tipocuenta_bp.route('/api/tipocuenta/list', methods=['GET'])
 def list_tipocuentas():
