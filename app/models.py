@@ -61,9 +61,9 @@ class CuentaContable(db.Model):
 
     cuentaid = db.Column(db.Integer, primary_key=True)
     templateid = db.Column(db.Integer, db.ForeignKey('template_balance.templateid'), nullable=False)
-    nivel = db.Column(db.Integer)
+    nivel = db.Column(db.Integer, nullable=True)
     tipoid = db.Column(db.Integer, db.ForeignKey('tipocuenta.tipocuentaid'), nullable=False)
-    codigo = db.Column(db.String(50), nullable=False)
+    codigo = db.Column(db.String(50), nullable=True)
     nombre = db.Column(db.String(200), nullable=False)
     proyeccion = db.Column(db.String(2))
     segmento = db.Column(db.String(150))
@@ -71,6 +71,33 @@ class CuentaContable(db.Model):
 
     def __repr__(self):
         return f"<CuentaContable {self.codigo} - {self.nombre}>"
+class ValidacionesCtgoCts(db.Model):
+    __tablename__ = 'validacionesctgocts'
+
+    validacionesid = db.Column(db.Integer, primary_key=True)
+    templateid     = db.Column(db.Integer, db.ForeignKey('template_balance.templateid'), nullable=False)
+    tipo           = db.Column(db.Integer, default=True)
+    nivel          = db.Column(db.Integer, default=True)
+    description    = db.Column(db.Text)
+    cuentaobjetivo = db.Column(db.Text)
+    expresion      = db.Column(db.Text)
+    operador       = db.Column(db.Text)
+    validacion     = db.Column(db.Boolean, default=True)
+
+    template = db.relationship('Template_Balance', backref='validaciones')
+
+    def to_dict(self):
+        return {
+            "validacionesid": self.validacionesid,
+            "templateid": self.templateid,
+            "tipo": self.tipo,
+            "nivel": self.nivel,
+            "description": self.description,
+            "cuentaobjetivo": self.cuentaobjetivo,
+            "expresion": self.expresion,
+            "operador": self.operador,
+            "validacion": self.validacion
+        }
 class SaldoMensualCTS(db.Model):
     __tablename__ = 'saldo_mensual_cts'
 
@@ -78,6 +105,7 @@ class SaldoMensualCTS(db.Model):
     cuentaid = db.Column(db.Integer, db.ForeignKey('cuenta_contable.cuentaid'), nullable=False)
     periodoid = db.Column(db.Integer, db.ForeignKey('periodo.periodoid'), nullable=False)
     saldo = db.Column(db.Numeric(18, 2))
+    sucursalid = db.Column(db.Integer, nullable=False)
 
     def __repr__(self):
         return f"<SaldoMensualCTS {self.anio}-{self.mes} cuenta={self.cuentaid}>"
@@ -148,6 +176,7 @@ class ValorIndicador(db.Model):
     indicadorid = db.Column(db.Integer, db.ForeignKey('indicador.indicadorid'), nullable=False)
     periodoid = db.Column(db.Integer, db.ForeignKey('periodo.periodoid'), nullable=False)
     valor = db.Column(db.Numeric(18,2))
+    sucursalid = db.Column(db.Integer, nullable=False)
 
     __table_args__ = (
         db.UniqueConstraint('indicadorid', 'periodoid', name='uq_indicador_periodo'),
@@ -163,6 +192,7 @@ class Modelo(db.Model):
     modelo = db.Column(db.String(100))
     ubicacion = db.Column(db.String(250))
     variables = db.Column(JSONB)  # <-- Columna para guardar JSON
+    sucursalid = db.Column(db.Integer, nullable=False)
 
     cuenta = db.relationship('CuentaContable', backref=db.backref('modelos', lazy=True))
 
