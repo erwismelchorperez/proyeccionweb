@@ -16,6 +16,7 @@ def crear_modelo():
     modelo_nombre = data.get('modelo')
     ubicacion = data.get('ubicacion')
     variables = data.get('variables')  # <-- aquí capturamos el JSON
+    sucursalid = data.get('sucursalid')
 
     if not cuentaid:
         return jsonify({"error": "cuentaid es requerido"}), 400
@@ -31,7 +32,7 @@ def crear_modelo():
             "error": "El campo 'variables' debe ser un objeto JSON o una lista de objetos"
         }), 400
 
-    nuevo_modelo = Modelo(cuentaid=cuentaid, modelo=modelo_nombre, ubicacion=ubicacion, variables= variables)
+    nuevo_modelo = Modelo(cuentaid=cuentaid, modelo=modelo_nombre, ubicacion=ubicacion, variables= variables, sucursalid = sucursalid)
     db.session.add(nuevo_modelo)
     db.session.commit()
 
@@ -41,7 +42,8 @@ def crear_modelo():
         "cuentaid": nuevo_modelo.cuentaid,
         "modelo": nuevo_modelo.modelo,
         "ubicacion": nuevo_modelo.ubicacion,
-        "variables": variables
+        "variables": variables,
+        "sucursalid": nuevo_modelo.sucursalid
     }), 201
 @modelos_bp.route('/api/modelos/list', methods=['POST'])
 def listar_modelos():
@@ -62,3 +64,4 @@ def listar_modelos():
             "variables":m.variables
         } for m in modelos
     ])
+# listas todos los modelos por sucursal
