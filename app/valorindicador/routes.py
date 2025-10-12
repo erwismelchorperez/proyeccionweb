@@ -23,6 +23,7 @@ def crear_valorindicador():
     indicadorid = data.get("indicadorid")
     periodoid = data.get("periodoid")
     valor = data.get("valor")
+    sucursalid = data.get("sucursalid")
 
     if not indicadorid or not periodoid:
         return jsonify({"error": "indicadorid y periodoid son requeridos"}), 400
@@ -39,7 +40,7 @@ def crear_valorindicador():
         return jsonify({"error": "Valor ya registrado para este indicador y periodo"}), 400
 
     # Crear registro
-    registro = ValorIndicador(indicadorid=indicadorid, periodoid=periodoid, valor=valor)
+    registro = ValorIndicador(indicadorid=indicadorid, periodoid=periodoid, valor=valor, sucursalid = sucursalid)
     db.session.add(registro)
     db.session.commit()
 
@@ -48,7 +49,8 @@ def crear_valorindicador():
         "valorindid": registro.valorindid,
         "indicadorid": registro.indicadorid,
         "periodoid": registro.periodoid,
-        "valor": float(registro.valor)
+        "valor": float(registro.valor),
+        "sucursalid":registro.sucursalid
     }), 201
 
 # Listar valores (opcional filtro por indicador o periodo)
@@ -77,6 +79,8 @@ def listar_valorindicador():
             "valorindid": r.valorindid,
             "indicadorid": r.indicadorid,
             "periodoid": r.periodoid,
-            "valor": float(r.valor)
+            "valor": float(r.valor),
+            "sucursalid": r.sucursalid
         } for r in registros
     ])
+# listar valor de los indicadores por sucursal

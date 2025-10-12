@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import SaldoMensualCTS, Template_Balance, CuentaContable, Periodo
+from app.models import SaldoMensualCTS, Template_Balance, CuentaContable, Periodo, Modelo, SucursalTemplate
 
 saldo_mensual_cts_bp = Blueprint('saldo_mensual_cts_bp', __name__)
 
@@ -27,7 +27,7 @@ def api_crear_saldos():
         return jsonify({"error": f"No existe un periodo registrado para {anio}-{mes}"}), 400
 
     # 2️⃣ Template activo de la sucursal
-    template = Template_Balance.query.filter_by(sucursalid=sucursalid, activo=True).first()
+    template = SucursalTemplate.query.filter_by(sucursalid=sucursalid, activo=True).first()
     if not template:
         return jsonify({"error": "No existe template activo para esta sucursal"}), 400
 
@@ -60,7 +60,8 @@ def api_crear_saldos():
         nuevo_saldo = SaldoMensualCTS(
             cuentaid=cuenta.cuentaid,
             periodoid=periodo.periodoid,   # <<-- aquí
-            saldo=monto
+            saldo=monto,
+            sucursalid = sucursalid
         )
         db.session.add(nuevo_saldo)
 
@@ -69,6 +70,7 @@ def api_crear_saldos():
             "cuentaid": cuenta.cuentaid,
             "nombre": cuenta.nombre,
             "periodoid": periodo.periodoid,
+            "sucursalid" : sucursalid,
             "saldo": float(monto)
         })
 
@@ -80,3 +82,80 @@ def api_crear_saldos():
         "periodoid": periodo.periodoid,
         "registros": registros_insertados
     }), 201
+@saldo_mensual_cts_bp.route('/api/saldos/ultimo', methods=['POST'])
+def api_obtener_ultimo_saldo():
+    data = request.get_json()
+
+    # Validar datos mínimos
+    if not data or not all(k in data for k in ("institutionid", "sucursalid")):
+        return jsonify({"error": "institutionid y sucursalid son requeridos"}), 400
+
+    institutionid = data["institutionid"]
+    sucursalid    = data["sucursalid"]
+
+    # 1 Template activo de la sucursal
+    template = Template_Balance.query.filter_by(sucursalid=sucursalid, activo=True).first()
+    if not template:
+        return jsonify({"error": "No existe template activo para esta sucursal"}), 400
+
+    # 2 Último periodo con saldos registrados
+    ultimo_periodo = (
+        db.session.query(Periodo)
+        .join(SaldoMensualCTS, SaldoMensualCTS.periodoid == Periodo.periodoid)
+        .join(CuentaContable, CuentaContable.cuentaid == SaldoMensualCTS.cuentaid)
+        .filter(CuentaContable.templateid == template.templateid,
+                SaldoMensualCTS.sucursalid == sucursalid)  
+        .order_by(Periodo.anio.desc(), Periodo.mes.desc())
+        .first()
+    )
+
+    if not ultimo_periodo:
+        return jsonify({"error": "No se encontraron saldos registrados para esta sucursal"}), 404
+
+    # 3 Traer saldos y cuentas del último periodo
+    saldos = (
+        db.session.query(SaldoMensualCTS, CuentaContable)
+        .join(CuentaContable, CuentaContable.cuentaid == SaldoMensualCTS.cuentaid)
+        .filter(
+            CuentaContable.templateid == template.templateid,
+            SaldoMensualCTS.periodoid == ultimo_periodo.periodoid,
+            SaldoMensualCTS.sucursalid == sucursalid)
+        .all()
+    )
+
+    registros = []
+    for saldo, cuenta in saldos:
+        # Buscar los modelos relacionados con esta cuenta (relación 1:N)
+        modelos = (
+            Modelo.query
+            .filter_by(cuentaid=cuenta.cuentaid, sucursalid=sucursalid)
+            .all()
+        )
+
+        modelos_data = [
+            {
+                "modeloid": m.modeloid,
+                "modelo": m.modelo,
+                "ubicacion": m.ubicacion
+            }
+            for m in modelos
+        ]
+
+        registros.append({
+            "codigo": cuenta.codigo,
+            "nombre": cuenta.nombre,
+            "saldo": float(saldo.saldo),
+            "cuentaid": cuenta.cuentaid,
+            "modelos": modelos_data
+        })
+
+    return jsonify({
+        "message": "Último periodo con saldos encontrado",
+        "institutionid": institutionid,
+        "sucursalid": sucursalid,
+        "templateid": template.templateid,
+        "periodoid": ultimo_periodo.periodoid,
+        "anio": ultimo_periodo.anio,
+        "mes": ultimo_periodo.mes,
+        "saldos": registros
+    }), 200
