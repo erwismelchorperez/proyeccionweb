@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import Template_Balance
+from app.models import Template_Balance, Institution, InstitutionTemplate
 
 template_balance_bp = Blueprint('template_balance_bp', __name__)
 
@@ -13,27 +13,58 @@ template_balance_bp = Blueprint('template_balance_bp', __name__)
 def api_crear_template():
     data = request.get_json()
 
-    if not data or "nombre" not in data:
-        return jsonify({"error": "nombre datos son requeridos"}), 400
+    if not data or "nombre" not in data or "institutionid" not in data:
+        return jsonify({"error": "Los campos 'nombre' e 'institutionid' son requeridos"}), 400
 
+    institution_id = data["institutionid"]
+
+    # Validar existencia de la institution
+    institution = Institution.query.get(institution_id)
+    if not institution:
+        return jsonify({"error": "La institution especificada no existe"}), 404
+
+    # 1️⃣ Crear el template
     template = Template_Balance(
         nombre=data["nombre"],
         descripcion=data.get("descripcion")
     )
-
     db.session.add(template)
+    db.session.flush()  # Necesario para obtener template.templateid sin hacer commit todavía
+
+    # 2️⃣ Buscar si ya hay un template activo para esta institution
+    template_existente = InstitutionTemplate.query.filter_by(
+        institutionid=institution_id,
+        activo=True
+    ).first()
+
+    if template_existente:
+        template_existente.activo = False
+        db.session.add(template_existente)
+
+    # 3️⃣ Crear la nueva relación como activa
+    nueva_relacion = InstitutionTemplate(
+        institutionid=institution_id,
+        templateid=template.templateid,
+        activo=True
+    )
+    db.session.add(nueva_relacion)
     db.session.commit()
 
     return jsonify({
-        "message": "Template creado exitosamente",
+        "message": "Template creado y relación con institution registrada correctamente",
         "template": {
             "templateid": template.templateid,
             "nombre": template.nombre,
             "descripcion": template.descripcion,
             "created_at": template.created_at
+        },
+        "institution_template": {
+            "insttempid": nueva_relacion.insttempid,
+            "institutionid": nueva_relacion.institutionid,
+            "templateid": nueva_relacion.templateid,
+            "activo": nueva_relacion.activo
         }
     }), 201
-
 
 # 📌 Actualizar un template balance
 @template_balance_bp.route('/api/Updatetemplate', methods=['POST'])
