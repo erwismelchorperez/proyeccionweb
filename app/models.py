@@ -16,11 +16,11 @@ class User(UserMixin, db.Model):
     institution_id = db.Column(db.Integer, db.ForeignKey('institution.institutionid'), nullable=False)
 class Institution(db.Model):
     institutionid = db.Column(db.Integer, primary_key=True)
+    _id = db.Column(db.String(30), nullable=False)
+    alias = db.Column(db.String(255), nullable=False)
     nombre = db.Column(db.String(150), nullable=False)
     descripcion = db.Column(db.Text, nullable=True)
     fecha_creacion = db.Column(db.DateTime, server_default=db.func.now())
-
-    usuarios = db.relationship('User', backref='institution', lazy=True, cascade="all, delete")
     
     def __repr__(self):
         return f"<Institution {self.nombre}>"
@@ -30,6 +30,7 @@ class Sucursal(db.Model):
     sucursalid = db.Column(db.Integer, primary_key=True)
     codigo = db.Column(db.String(50), nullable=False)
     nombre = db.Column(db.String(150), nullable=False)
+    consolidado = db.Column(db.Boolean, default=False)
     institutionid = db.Column(db.Integer, db.ForeignKey('institution.institutionid'), nullable=False)
     institution = db.relationship('Institution', backref=db.backref('sucursal', lazy=True))
 
@@ -37,6 +38,7 @@ class Sucursal(db.Model):
         return f"<Sucursal {self.nombre} ({self.codigo})>"
 class SucursalTemplate(db.Model):
     """
+        Este ya no funciona ya no se utilizará
         Esta tabla mantiene la relación entre sucursal y template
     """
     __tablename__ = 'sucursal_template'
@@ -47,6 +49,18 @@ class SucursalTemplate(db.Model):
     activo = db.Column(db.Boolean, default=False, nullable=False)
 
     __table_args__ = (db.UniqueConstraint('sucursalid', 'templateid', name='uq_sucursal_template'),)
+class InstitutionTemplate(db.Model):
+    """
+        Esta tabla mantiene la relación entre la institution y template
+    """
+    __tablename__ = 'institution_template'
+    
+    insttempid = db.Column(db.Integer, primary_key=True)
+    institutionid = db.Column(db.Integer, db.ForeignKey('institution.institutionid', ondelete='CASCADE'), nullable=False)
+    templateid = db.Column(db.Integer, db.ForeignKey('template_balance.templateid', ondelete='CASCADE'), nullable=False)
+    activo = db.Column(db.Boolean, default=False, nullable=False)
+
+    __table_args__ = (db.UniqueConstraint('institutionid', 'templateid', name='uq_institution_template'),)
 class Template_Balance(db.Model):
     __tablename__ = 'template_balance'
     templateid = db.Column(db.Integer, primary_key=True)
@@ -156,7 +170,7 @@ class Indicador(db.Model):
     indicador = db.Column(db.String(150), nullable=False)
     descripcion = db.Column(db.Text)
     formula = db.Column(JSONB)
-
+    universo = db.Column(db.Boolean, default=False)
     grupo = db.relationship('Grupo', backref=db.backref('indicador', lazy=True))
 
     def __repr__(self):

@@ -31,27 +31,45 @@ def api_lista_sucursales():
 def api_crear_sucursal():
     data = request.get_json()
 
-    # Validación básica (puedes mejorarla)
-    if not data or "institutionid" not in data:
-        return jsonify({"error": "institutionid es requerido"}), 400
+    if not data or "institutionid" not in data or "sucursales" not in data:
+        return jsonify({"error": "Se requiere 'institutionid' y 'sucursales'"}), 400
 
-    sucursal = Sucursal(
-        institutionid=data.get("institutionid"),
-        codigo=data.get("codigo"),
-        nombre=data.get("nombre")
-    )
+    institutionid = data["institutionid"]
+    sucursales_data = data["sucursales"]
 
-    db.session.add(sucursal)
+    if not isinstance(sucursales_data, list) or len(sucursales_data) == 0:
+        return jsonify({"error": "'sucursales' debe ser un arreglo con al menos un elemento"}), 400
+
+    # Validar que solo una sucursal tenga consolidado True
+    consolidado_true_count = sum(1 for s in sucursales_data if s.get("consolidado") is True)
+    if consolidado_true_count > 1:
+        return jsonify({"error": "Solo puede haber una sucursal con consolidado=True"}), 400
+
+    nuevas_sucursales = []
+    for s in sucursales_data:
+        sucursal = Sucursal(
+            institutionid=institutionid,
+            codigo=s.get("codigo"),
+            nombre=s.get("nombre"),
+            consolidado=bool(s.get("consolidado", False))  # por defecto False
+        )
+        db.session.add(sucursal)
+        nuevas_sucursales.append(sucursal)
+
     db.session.commit()
 
     return jsonify({
-        "message": "sucursal registrado exitosamente",
-        "sucursal": {
-            "sucursalid": sucursal.sucursalid,
-            "institutionid": sucursal.institutionid,
-            "codigo": sucursal.codigo,
-            "nombre": sucursal.nombre
-        }
+        "message": "Sucursal(es) registrada(s) exitosamente",
+        "sucursales": [
+            {
+                "sucursalid": sc.sucursalid,
+                "institutionid": sc.institutionid,
+                "codigo": sc.codigo,
+                "nombre": sc.nombre,
+                "consolidado": sc.consolidado
+            }
+            for sc in nuevas_sucursales
+        ]
     }), 201
 @sucursal_bp.route('/api/Updatesucursal', methods=['POST'])
 def api_update_sucursal():
