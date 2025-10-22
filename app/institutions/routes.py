@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import text
 from app.models import Institution, TemplateBalance, ValidacionTemplate
 from .forms import InstitutionForm, SubirTemplateForm, ValidacionTemplateForm
+import requests
 
 institutions_bp = Blueprint('institutions', __name__, template_folder='templates')
 
@@ -116,99 +117,111 @@ def listarInstituciones():
     for inst in instituciones:
         result.append({
             "id": inst.institutionid,
+            "_id": inst._id,
+            "alias": inst.alias,
             "nombre": inst.nombre,
             "descripcion": inst.descripcion,
             "fecha_creacion": inst.fecha_creacion.isoformat() if inst.fecha_creacion else None
         })
     
     return jsonify(result)
-@institutions_bp.route('/instituciones/CrearInstitucion', methods=['POST'])
-def CrearInstitucion():
-    data = request.get_json()  # recibe JSON desde el front o Postman
-    if not data:
-        return jsonify({"error": "No se recibieron datos"}), 400
-
-    nombre = data.get("nombre")
-    descripcion = data.get("descripcion")
-
-    if not nombre:  # validación simple
-        return jsonify({"error": "El nombre es obligatorio"}), 400
-
-    nueva_inst = Institution(nombre=nombre, descripcion=descripcion)
-    db.session.add(nueva_inst)
-    db.session.commit()
-
-    # Devolver el objeto creado como JSON
-    return jsonify({
-        "institutionid": nueva_inst.institutionid,
-        "nombre": nueva_inst.nombre,
-        "descripcion": nueva_inst.descripcion,
-        "fecha_creacion": nueva_inst.fecha_creacion.isoformat() if nueva_inst.fecha_creacion else None
-    }), 201
-@institutions_bp.route('/instituciones/subirTemplate', methods=['GET', 'POST'])
-def subirTemplate():
-    # 1. Verifica que venga el id en el form-data
-    institucion_id = request.form.get('institucion_id')
-    if not institucion_id:
-        return jsonify({
-            "status": "error",
-            "message": "Debes enviar el campo 'institucion_id' en el form-data."
-        }), 400
-
-    institucion = Institution.query.get(institucion_id)
-    if not institucion:
-        return jsonify({
-            "status": "error",
-            "message": f"No existe la institución con id {institucion_id}."
-        }), 404
-
-    # 2. Verifica que venga un archivo
-    if 'archivo' not in request.files:
-        return jsonify({
-            "status": "error",
-            "message": "No se encontró el archivo CSV en la petición (usa form-data con key='archivo')."
-        }), 400
-
-    archivo = request.files['archivo']
-    if archivo.filename == '':
-        return jsonify({
-            "status": "error",
-            "message": "El archivo CSV está vacío."
-        }), 400
-
+@institutions_bp.route("/api/instituciones", methods=["GET"])
+def obtener_empresas():
     try:
-        # 3. Leer CSV directamente en memoria
-        stream = io.StringIO(archivo.stream.read().decode("utf-8-sig"))
-        reader = csv.DictReader(stream)
+        # URL de la API externa
+        url = "http://api-adminclient.rflatina.com/rfl/api/v1/companies"
+        
+        # Token Bearer
+        token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6IjYyNDIwYTA4YjQzZTRjMDAxMzJkOGQxYiIsImVtYWlsIjoiaW5mb0ByZmxhdGluYS5jb20iLCJuYW1lIjoiR2FicmllbCIsImxhc3RfbmFtZSI6Ik1FZ3VleiIsImNvbXBhbnlfaWQiOiI2MDc2MmY5YTc2NmMwYTAwMWE5N2VjMjYiLCJjb21wYW55X25hbWUiOiJGcmllZHJpY2ggQ29uc3VsdGluZyBHcnVwIiwiY29tcGFueV9jb3VudHJ5IjoiTWV4aWNvIiwiY29tcGFueV9hbGlhcyI6IkZyaWVkcmljaCIsInJvbGUiOiJSaWVzZ28gQ3JlZGl0byIsIm1vZHVsZXMiOlsiYWxlLXJpZXNnb2RlY3LDqWRpdG8iLCJhbGUtZ2FwJ3MiLCJhbGUtYmVuY2htYXJraW5nIiwiYWxlLXRlbmRlbmNpYWRlcMOpcmRpZGEiLCJhbGUtbWF0cml6dHJhbnNpY2nDs24iLCJhbGUtY29zZWNoYXMiLCJhbGUtY29uY2VudHJhY2nDs24iLCJhbGUtbWF5b3Jlc2RldWRvcmVzIl0sImlhdCI6MTc2MDk4Njk0MCwiZXhwIjoxNzkyNTIyOTQwfQ.nGD7FkQWMNuXP-ofKd-Mh6LIi2TzTcplT6JEquZeIaI"  # ⚠️ remplázalo por tu token real
+        
+        # Encabezados de autorización
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json"
+        }
+        
+        # Petición GET a la API externa
+        response = requests.get(url, headers=headers, timeout=10)
+        
+        # Si la respuesta no fue exitosa, manejar error
+        if response.status_code != 200:
+            return jsonify({
+                "error": f"Error al conectar con la API externa ({response.status_code})",
+                "detalle": response.text
+            }), response.status_code
+        
+        # Retornar la respuesta en formato JSON
+        data = response.json()
+        return jsonify({"message": "Datos obtenidos correctamente", "data": data})
+    
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+@institutions_bp.route("/api/instituciones/unificar", methods=["GET"])
+def obtener_empresas_header():
+    try:
+        # 1️⃣ Obtener el token del header Authorization
+        auth_header = request.headers.get("Authorization")
 
-        nuevos_templates = []
-        for row in reader:
-            template = TemplateBalance(
-                nivel=row['nivel'],
-                cuenta=row['cuenta'],
-                codigo=row['codigo'].strip(),
-                proyeccion=row['proyeccion'].strip(),
-                institution_id=institucion.id
-            )
-            db.session.add(template)
-            nuevos_templates.append({
-                "nivel": row['nivel'],
-                "cuenta": row['cuenta'],
-                "codigo": row['codigo'].strip(),
-                "proyeccion": row['proyeccion'].strip()
-            })
+        if not auth_header:
+            return jsonify({"error": "Debe incluir 'Authorization' en los headers"}), 400
+
+        # 2️⃣ Verificar que comience con 'Bearer '
+        if not auth_header.startswith("Bearer "):
+            return jsonify({"error": "El header Authorization debe comenzar con 'Bearer '"}), 400
+
+        # 3️⃣ Extraer solo el token
+        token = auth_header.split(" ")[1]
+
+        # 4️⃣ Preparar la solicitud a la API externa
+        url = "http://api-adminclient.rflatina.com/rfl/api/v1/companies"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Accept": "application/json"
+        }
+
+        response = requests.get(url, headers=headers, timeout=10)
+
+        # 5️⃣ Manejar errores de la API externa
+        if response.status_code != 200:
+            return jsonify({
+                "error": f"Error al conectar con la API externa ({response.status_code})",
+                "detalle": response.text
+            }), response.status_code
+
+        companies = response.json()
+
+        # Recorrer cada registro
+        nuevos = 0
+        existentes = 0
+        for company in companies:
+            company_id = company.get("_id")
+            company_name = company.get("company_name")
+            company_alias = company.get("alias")
+
+            if not company_id:
+                continue
+
+            # Verificar si ya existe
+            existe = Institution.query.filter_by(_id=company_id).first()
+
+            if not existe:
+                # Crear nuevo registro
+                nueva_inst = Institution(_id=company_id, nombre=company_name, alias= company_alias)
+                db.session.add(nueva_inst)
+                nuevos += 1
+            else:
+                existentes += 1
 
         db.session.commit()
 
-        # 4. Respuesta JSON para Postman
-        return jsonify({
-            "status": "success",
-            "message": f"Se cargaron {len(nuevos_templates)} registros desde el archivo CSV.",
-            "templates_guardados": nuevos_templates
-        }), 201
+
+        # 6️⃣ Retornar la respuesta correcta
+        return jsonify(response.json()), 200
+
+    except requests.exceptions.RequestException as e:
+        # Errores de conexión, timeout, etc.
+        return jsonify({"error": "Error al realizar la solicitud externa", "detalle": str(e)}), 500
 
     except Exception as e:
-        return jsonify({
-            "status": "error",
-            "message": f"Error procesando el CSV: {str(e)}"
-        }), 500
+        # Cualquier otro error inesperado
+        return jsonify({"error": "Error interno del servidor", "detalle": str(e)}), 500

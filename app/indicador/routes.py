@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import Grupo, Indicador, Pais
+from app.models import Grupo, Indicador, Pais, TempInd, Template_Balance
 
 indicador_bp = Blueprint('indicador_bp', __name__)
 
@@ -18,6 +18,7 @@ def crear_indicador():
     indicador_nombre = data.get('indicador')
     descripcion = data.get('descripcion')
     formula = data.get('formula')  # Espera JSON
+    templateid = data.get('templateid')
 
     if not grupoid or not indicador_nombre:
         return jsonify({"error": "grupoid e indicador son requeridos"}), 400
@@ -29,6 +30,15 @@ def crear_indicador():
     # Validar clavepais opcional
     if clavepais and not Pais.query.get(clavepais):
         return jsonify({"error": "País no existe"}), 404
+
+    # Si se pasa templateid, validar que exista el template
+    if templateid:
+        template = Template_Balance.query.get(templateid)
+        if not template:
+            return jsonify({"error": "Template no existe"}), 404
+        universo = False
+    else:
+        universo = True
 
     # Validar si ya existe el indicador
     indicador_existente = Indicador.query.filter_by(
@@ -46,17 +56,30 @@ def crear_indicador():
         clavepais=clavepais,
         indicador=indicador_nombre,
         descripcion=descripcion,
-        formula=formula
+        formula=formula if not templateid else None,  # si tiene template, se guarda en TempInd
+        universo=universo
     )
     db.session.add(indicador)
     db.session.commit()
+
+    # Si se pasó templateid, crear la relación en TempInd
+    if templateid:
+        temp_ind = TempInd(
+            indicadorid=indicador.indicadorid,
+            templateid=templateid,
+            formula=formula  # Guardamos la fórmula en la tabla TempInd
+        )
+        db.session.add(temp_ind)
+        db.session.commit()
 
     return jsonify({
         "message": "Indicador creado exitosamente",
         "indicadorid": indicador.indicadorid,
         "grupoid": indicador.grupoid,
         "clavepais": indicador.clavepais,
-        "indicador": indicador.indicador
+        "indicador": indicador.indicador,
+        "universo": indicador.universo,
+        "templateid": templateid if templateid else None
     }), 201
 # Listar indicadores
 @indicador_bp.route('/api/indicador/list', methods=['POST'])
