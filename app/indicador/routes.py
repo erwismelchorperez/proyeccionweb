@@ -86,12 +86,15 @@ def crear_indicador():
 def listar_indicadores():
     data = request.json or {}
     indicadorid = data.get('indicadorid')
+    clavepais = data.get('clavepais')
+    templateid = data.get('templateid')  # <-- Nuevo parámetro
 
+    # Si se envía un ID específico
     if indicadorid:
         indicador = Indicador.query.get(indicadorid)
         if not indicador:
             return jsonify({"error": f"No se encontró el indicador con id {indicadorid}"}), 404
-        # Retorna un solo objeto
+        
         result = {
             "indicadorid": indicador.indicadorid,
             "grupoid": indicador.grupoid,
@@ -102,17 +105,88 @@ def listar_indicadores():
         }
         return jsonify(result), 200
 
+    # Si se envía un templateid, listamos solo los indicadores asociados
+    elif templateid:
+        indicadores = (
+            db.session.query(Indicador)
+            .join(TempInd, TempInd.indicadorid == Indicador.indicadorid)
+            .filter(TempInd.templateid == templateid)
+            .all()
+        )
+
+        if not indicadores:
+            return jsonify({"message": f"No se encontraron indicadores para el templateid '{templateid}'"}), 404
+
+    # Si se envía clavepais
+    elif clavepais:
+        indicadores = Indicador.query.filter_by(clavepais=clavepais, universo=True).all()
+        if not indicadores:
+            return jsonify({"message": f"No se encontraron indicadores para clavepais '{clavepais}'"}), 404
+
+    # Si no hay filtros, retorna todos
     else:
-        # Retorna todos
         indicadores = Indicador.query.all()
-        result = [
-            {
-                "indicadorid": i.indicadorid,
-                "grupoid": i.grupoid,
-                "clavepais": i.clavepais,
-                "indicador": i.indicador,
-                "descripcion": i.descripcion,
-                "formula": i.formula
-            } for i in indicadores
-        ]
-        return jsonify(result), 200
+
+    # Construimos el resultado
+    result = [
+        {
+            "indicadorid": i.indicadorid,
+            "grupoid": i.grupoid,
+            "clavepais": i.clavepais,
+            "indicador": i.indicador,
+            "descripcion": i.descripcion,
+            "formula": i.formula
+        } for i in indicadores
+    ]
+
+    return jsonify(result), 200
+# Servicio para modificar la fórmula del indicador
+@indicador_bp.route('/api/indicador/update_formula', methods=['POST'])
+def actualizar_formula_indicador():
+    data = request.get_json()
+
+    indicadorid = data.get('indicadorid')
+    formula = data.get('formula')
+
+    if not indicadorid or not formula:
+        return jsonify({"error": "indicadorid y formula son requeridos"}), 400
+
+    indicador = Indicador.query.get(indicadorid)
+    if not indicador:
+        return jsonify({"error": f"No se encontró el indicador con id {indicadorid}"}), 404
+
+    # Actualizar fórmula
+    indicador.formula = formula
+    db.session.commit()
+
+    return jsonify({
+        "message": "Fórmula del indicador actualizada exitosamente",
+        "indicadorid": indicador.indicadorid,
+        "formula": indicador.formula
+    }), 200
+# Servicio para modificar la fórmula de un indicador asociado a un template
+@indicador_bp.route('/api/tempind/update_formula', methods=['POST'])
+def actualizar_formula_tempind():
+    data = request.get_json()
+
+    indicadorid = data.get('indicadorid')
+    templateid = data.get('templateid')
+    formula = data.get('formula')
+
+    if not indicadorid or not templateid or not formula:
+        return jsonify({"error": "indicadorid, templateid y formula son requeridos"}), 400
+
+    tempind = TempInd.query.filter_by(indicadorid=indicadorid, templateid=templateid).first()
+    if not tempind:
+        return jsonify({"error": f"No existe relación entre templateid {templateid} e indicadorid {indicadorid}"}), 404
+
+    # Actualizar fórmula del template
+    tempind.formula = formula
+    db.session.commit()
+
+    return jsonify({
+        "message": "Fórmula del indicador-template actualizada exitosamente",
+        "templateid": tempind.templateid,
+        "indicadorid": tempind.indicadorid,
+        "formula": tempind.formula
+    }), 200
