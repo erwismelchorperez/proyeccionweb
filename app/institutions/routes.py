@@ -250,5 +250,5 @@ def obtener_empresas_header():
 
     except Exception as e:
         # Cualquier otro error inesperado
-	db.session.rollback()
+        db.session.rollback()
         return jsonify({"error": "Error interno del servidor", "detalle": str(e)}), 500
