@@ -3,8 +3,8 @@ from app import db
 import io
 import csv
 from werkzeug.utils import secure_filename
-from sqlalchemy import text
-from app.models import Institution, TemplateBalance, ValidacionTemplate
+from sqlalchemy import text, func
+from app.models import Institution, TemplateBalance, ValidacionTemplate, Pais
 from .forms import InstitutionForm, SubirTemplateForm, ValidacionTemplateForm
 import requests
 
@@ -121,6 +121,7 @@ def listarInstituciones():
             "alias": inst.alias,
             "nombre": inst.nombre,
             "descripcion": inst.descripcion,
+            "clavepais": inst.country,
             "fecha_creacion": inst.fecha_creacion.isoformat() if inst.fecha_creacion else None
         })
     
@@ -159,29 +160,22 @@ def obtener_empresas():
 @institutions_bp.route("/api/instituciones/unificar", methods=["GET"])
 def obtener_empresas_header():
     try:
-        # 1️⃣ Obtener el token del header Authorization
+        # 1️⃣ Obtener token del header
         auth_header = request.headers.get("Authorization")
-
         if not auth_header:
             return jsonify({"error": "Debe incluir 'Authorization' en los headers"}), 400
 
-        # 2️⃣ Verificar que comience con 'Bearer '
         if not auth_header.startswith("Bearer "):
             return jsonify({"error": "El header Authorization debe comenzar con 'Bearer '"}), 400
 
-        # 3️⃣ Extraer solo el token
         token = auth_header.split(" ")[1]
 
-        # 4️⃣ Preparar la solicitud a la API externa
+        # 2️⃣ Consumir API externa
         url = "http://api-adminclient.rflatina.com/rfl/api/v1/companies"
-        headers = {
-            "Authorization": f"Bearer {token}",
-            "Accept": "application/json"
-        }
+        headers = {"Authorization": f"Bearer {token}", "Accept": "application/json"}
 
         response = requests.get(url, headers=headers, timeout=10)
 
-        # 5️⃣ Manejar errores de la API externa
         if response.status_code != 200:
             return jsonify({
                 "error": f"Error al conectar con la API externa ({response.status_code})",
@@ -190,38 +184,67 @@ def obtener_empresas_header():
 
         companies = response.json()
 
-        # Recorrer cada registro
-        nuevos = 0
-        existentes = 0
+        nuevos, actualizados, sin_cambios = 0, 0, 0
+
         for company in companies:
             company_id = company.get("_id")
             company_name = company.get("company_name")
             company_alias = company.get("alias")
+            country_name = company.get("company_country")
 
             if not company_id:
                 continue
 
-            # Verificar si ya existe
+            # 3️⃣ Buscar clave del país
+            clavepais = None
+            if country_name:
+                pais = Pais.query.filter(func.lower(Pais.nombre) == country_name.lower()).first()
+                if pais:
+                    clavepais = pais.clavepais
+
             existe = Institution.query.filter_by(_id=company_id).first()
 
             if not existe:
-                # Crear nuevo registro
-                nueva_inst = Institution(_id=company_id, nombre=company_name, alias= company_alias)
+                # 🆕 Crear nuevo registro
+                nueva_inst = Institution(
+                    _id=company_id,
+                    nombre=company_name,
+                    alias=company_alias,
+                    country=clavepais
+                )
                 db.session.add(nueva_inst)
                 nuevos += 1
             else:
-                existentes += 1
+                # 🔄 Verificar si cambió algo
+                cambios = False
+                if existe.nombre != company_name:
+                    existe.nombre = company_name
+                    cambios = True
+                if existe.alias != company_alias:
+                    existe.alias = company_alias
+                    cambios = True
+                if existe.country != clavepais:
+                    existe.country = clavepais
+                    cambios = True
+
+                if cambios:
+                    actualizados += 1
+                else:
+                    sin_cambios += 1
 
         db.session.commit()
 
-
-        # 6️⃣ Retornar la respuesta correcta
-        return jsonify(response.json()), 200
+        # 4️⃣ Resumen final
+        return jsonify({
+            "message": "Sincronización completada",
+            "nuevos": nuevos,
+            "actualizados": actualizados,
+            "sin_cambios": sin_cambios,
+            "total_recibidos": len(companies)
+        }), 200
 
     except requests.exceptions.RequestException as e:
-        # Errores de conexión, timeout, etc.
         return jsonify({"error": "Error al realizar la solicitud externa", "detalle": str(e)}), 500
 
     except Exception as e:
-        # Cualquier otro error inesperado
         return jsonify({"error": "Error interno del servidor", "detalle": str(e)}), 500
