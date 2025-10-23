@@ -21,6 +21,7 @@ class Institution(db.Model):
     nombre = db.Column(db.String(150), nullable=False)
     descripcion = db.Column(db.Text, nullable=True)
     fecha_creacion = db.Column(db.DateTime, server_default=db.func.now())
+    country = db.Column(db.String(2), nullable=False)
     
     def __repr__(self):
         return f"<Institution {self.nombre}>"
