@@ -101,11 +101,13 @@ def subirtemplate(id):
 """
     Apartado que regresará todo lo de postman en fomrato JSON
 """
-@institutions_bp.route('/institucionesListar', methods=['POST'])
+@institutions_bp.route('/institucionesListar', methods=['GET','POST'])
 def listarInstituciones():
-    data = request.get_json(silent=True) or {}
-    institution_id = data.get('institutionid')
-
+    if request.method=='GET':
+        institution_id=request.args.get("institutionid",type=int)
+    else:
+        data = request.get_json(silent=True) or {}
+        institution_id = data.get('institutionid')
     # Si se pasa institutionid → filtra
     if institution_id:
         instituciones = Institution.query.filter_by(institutionid=institution_id).all()

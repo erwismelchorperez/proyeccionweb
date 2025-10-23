@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import Template_Balance, Institution, InstitutionTemplate
+from app.models import Template_Balance, Institution, InstitutionTemplate, TempInd
 
 template_balance_bp = Blueprint('template_balance_bp', __name__)
 
@@ -99,14 +99,47 @@ def api_update_template():
 # 📌 Listar todos los templates de una sucursal
 @template_balance_bp.route('/api/Listtemplates', methods=['GET','POST'])
 def api_list_templates():
-    templates = Template_Balance.query.all()
+    try:
+        templates = Template_Balance.query.all()
+        result = []
 
-    return jsonify([
-        {
-            "templateid": t.templateid,
-            "nombre": t.nombre,
-            "descripcion": t.descripcion,
-            "created_at": t.created_at
-        }
-        for t in templates
-    ])
+        for t in templates:
+            # Obtener las relaciones institution_template para este template
+            rels = InstitutionTemplate.query.filter_by(templateid=t.templateid).all()
+            institucion_ids = [r.institutionid for r in rels]
+
+            instituciones = []
+            if institucion_ids:
+                instituciones_query = (
+                    db.session.query(Institution)
+                    .filter(Institution.institutionid.in_(institucion_ids))
+                    .all()
+                )
+
+                instituciones = [
+                    {
+                        "institutionid": inst.institutionid,
+                        "nombre": getattr(inst, "nombre", None),
+                        "alias": getattr(inst, "alias", None),
+                        "clavepais": getattr(inst, "country", None),
+                        "activo_relacion": next((r.activo for r in rels if r.institutionid == inst.institutionid), None)
+                    }
+                    for inst in instituciones_query
+                ]
+
+            result.append({
+                "templateid": t.templateid,
+                "nombre": t.nombre,
+                "descripcion": t.descripcion,
+                "created_at": t.created_at,
+                "instituciones": instituciones
+            })
+
+        return jsonify(result), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({
+            "error": "Error al obtener los templates con sus instituciones",
+            "detalle": str(e)
+        }), 500
