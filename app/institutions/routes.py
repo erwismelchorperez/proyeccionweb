@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text, func
-from app.models import Institution, TemplateBalance, ValidacionTemplate, Pais
+from app.models import Institution, Template_Balance, ValidacionTemplate, Pais, InstitutionTemplate
 from .forms import InstitutionForm, SubirTemplateForm, ValidacionTemplateForm
 import requests
 
@@ -250,3 +250,48 @@ def obtener_empresas_header():
 
     except Exception as e:
         return jsonify({"error": "Error interno del servidor", "detalle": str(e)}), 500
+@institutions_bp.route('/api/instituciones-con-templates', methods=['GET', 'POST'])
+def listar_instituciones_con_templates():
+    data = request.get_json() or {}
+    institutionid = data.get('institutionid')
+    activo = data.get('activo')  # puede ser True o False
+
+    # Construir la consulta base
+    query = (
+        db.session.query(Institution, Template_Balance)
+        .join(InstitutionTemplate, InstitutionTemplate.institutionid == Institution.institutionid)
+        .join(Template_Balance, Template_Balance.templateid == InstitutionTemplate.templateid)
+    )
+
+    # Aplicar filtros si vienen en el JSON
+    if institutionid:
+        query = query.filter(Institution.institutionid == institutionid)
+
+    if activo is not None:
+        query = query.filter(InstitutionTemplate.activo == activo)
+
+    # Ejecutar la consulta
+    resultados = query.all()
+
+    if not resultados:
+        return jsonify({"message": "No se encontraron instituciones con templates"}), 404
+
+    # Construir el resultado agrupado por institución
+    instituciones_dict = {}
+    for inst, temp in resultados:
+        if inst.institutionid not in instituciones_dict:
+            instituciones_dict[inst.institutionid] = {
+                "institutionid": inst.institutionid,
+                "nombre": inst.nombre,
+                "alias": inst.alias,
+                "templates": []
+            }
+        instituciones_dict[inst.institutionid]["templates"].append({
+            "templateid": temp.templateid,
+            "nombre": temp.nombre,
+            "descripcion": temp.descripcion,
+            "activo": True  # o puedes traerlo desde InstitutionTemplate si lo necesitas
+        })
+
+    # Convertir el dict a lista
+    return jsonify(list(instituciones_dict.values())), 200
