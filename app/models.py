@@ -139,7 +139,7 @@ class Variable(db.Model):
     nombrevariable = db.Column(db.String(100), nullable=False)
     descripcionvariable = db.Column(db.Text)
     clavepais = db.Column(db.String(2), db.ForeignKey('pais.clavepais'))
-
+    universo = db.Column(db.Boolean, default=False)
     # Relación opcional si ya tienes el modelo País
     pais = db.relationship('Pais', backref=db.backref('variables', lazy=True))
 
@@ -230,13 +230,9 @@ class Semaforo(db.Model):
     semaforoid = db.Column(db.Integer, primary_key=True)
     indicadorid = db.Column(db.Integer, db.ForeignKey('indicador.indicadorid'), nullable=False)
     nombre = db.Column(db.String(50), nullable=False)
-    color = db.Column(db.String(1), nullable=False)
-    operador1 = db.Column(db.String(2), nullable=False)
-    valor1 = db.Column(db.Numeric(10,2), nullable=False)
-    operador2 = db.Column(db.String(50), nullable=True)
-    valor2 = db.Column(db.Numeric(10,2), nullable=True)
     limiteinf = db.Column(db.Numeric(10,2), nullable=False)
     limitesup = db.Column(db.Numeric(10,2), nullable=False)
+    condiciones = db.Column(JSONB)  # 👈 aquí se guardan todas las reglas
 """
     Apartado de catálogos
         Periodo
