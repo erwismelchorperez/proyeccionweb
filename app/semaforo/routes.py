@@ -17,32 +17,45 @@ def create_semaforo():
     if missing:
         return jsonify({"error": f"Faltan campos requeridos: {', '.join(missing)}"}), 400
 
-    # ✅ Verificar que el indicador existe
+    # ✅ Verificar que el indicador exista
     indicador = Indicador.query.get(data['indicadorid'])
     if not indicador:
         return jsonify({"error": "El indicador no existe"}), 404
 
-    # ✅ Validar estructura de condiciones
     condiciones = data['condiciones']
+
+    # ✅ Validar lista de condiciones
     if not isinstance(condiciones, list) or len(condiciones) == 0:
         return jsonify({"error": "El campo 'condiciones' debe ser una lista con al menos un elemento"}), 400
 
-    # 🚫 Limitar máximo 6 condiciones
+    # 🚫 Máximo 6 condiciones
     if len(condiciones) > 6:
-        return jsonify({"error": "Solo se permiten hasta 6 condiciones por semáforo"}), 400
+        return jsonify({"error": "Solo se permiten hasta 6 condiciones"}), 400
 
-    for i, c in enumerate(condiciones):
-        if not all(k in c for k in ('rangomin', 'rangomax', 'operadores', 'color')):
-            return jsonify({"error": f"Faltan campos en condición {i+1}. Se requiere 'rangomin', 'rangomax', 'operadores' y 'color'"}), 400
-        
-        if len(c['operadores']) != 2:
-            return jsonify({"error": f"La condición {i+1} debe tener exactamente 2 operadores"}), 400
+    # ✅ Validar estructura interna de cada condición
+    for i, cond in enumerate(condiciones):
+        color = cond.get("color")
+        reglas = cond.get("reglas")
 
-    # ✅ Crear nuevo registro de semáforo
+        if not color:
+            return jsonify({"error": f"Falta el campo 'color' en la condición {i+1}"}), 400
+        if not reglas or not isinstance(reglas, list):
+            return jsonify({"error": f"La condición {i+1} debe tener una lista de 'reglas'"}), 400
+
+        for j, r in enumerate(reglas):
+            # Validar que existan las claves necesarias, aunque sus valores puedan ser null
+            if not all(k in r for k in ('rangomin', 'rangomax', 'operadores')):
+                return jsonify({"error": f"Faltan campos en la regla {j+1} de la condición {i+1}"}), 400
+
+            operadores = r.get("operadores")
+            if not isinstance(operadores, list) or len(operadores) != 2:
+                return jsonify({"error": f"La regla {j+1} de la condición {i+1} debe tener exactamente 2 operadores"}), 400
+
+    # ✅ Crear nuevo registro
     semaforo = Semaforo(
         indicadorid=data['indicadorid'],
         nombre=data['nombre'],
-        condiciones=condiciones,  # 👈 guardamos como JSON
+        condiciones=condiciones,  # 👈 Guardamos el JSON completo sin modificar
         limiteinf=data.get('limiteinferior'),
         limitesup=data.get('limitesuperior')
     )
@@ -55,10 +68,12 @@ def create_semaforo():
         "semaforoid": semaforo.semaforoid,
         "indicadorid": semaforo.indicadorid,
         "nombre": semaforo.nombre,
-        "condiciones": semaforo.condiciones,
+        "condiciones": semaforo.condiciones,  # Se regresa igual al insertado
         "limiteinferior": semaforo.limiteinf,
         "limitesuperior": semaforo.limitesup
     }), 201
+
+
 # 📌 Listar semáforos de un indicador
 @semaforo_bp.route('/api/semaforo/listar', methods=['POST'])
 def listar_semaforos():

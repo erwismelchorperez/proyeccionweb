@@ -148,17 +148,15 @@ def crear_validacion():
     data = request.get_json()
 
     templateid     = data.get("templateid")
-    tipo_input     = data.get("tipo")
-    nivel          = data.get("nivel")
+    tipo_input     = data.get("tipo")   # Puede ser None
+    nivel_input    = data.get("nivel")  # Puede ser None
     description    = data.get("description")
     cuentaobjetivo = data.get("cuentaobjetivo")
     expresion      = data.get("expresion")
     operador       = data.get("operador")
-    validacion     = data.get("validacion", True)
+    validacion     = data.get("validation", True)
 
-    # -----------------------------
-    # 1️⃣ Validar template requerido
-    # -----------------------------
+    # 1️⃣ Validar template
     if not templateid:
         return jsonify({"error": "El campo 'templateid' es requerido"}), 400
 
@@ -166,43 +164,33 @@ def crear_validacion():
     if not template:
         return jsonify({"error": "No existe el template especificado"}), 404
 
-    # -----------------------------
-    # 2️⃣ Validar y resolver tipo
-    # -----------------------------
-    if not tipo_input:
-        return jsonify({"error": "El campo 'tipo' es requerido"}), 400
-
+    # 2️⃣ Validar tipo
     tipo_id = None
-
-    if isinstance(tipo_input, int):
-        # Buscar por ID
-        tipo_obj = TipoCuenta.query.get(tipo_input)
+    if tipo_input is not None:
+        if isinstance(tipo_input, int):
+            tipo_obj = TipoCuenta.query.get(tipo_input)
+        else:
+            tipo_obj = TipoCuenta.query.filter(
+                (TipoCuenta.nombre == tipo_input) | (TipoCuenta.clavetipo == tipo_input)
+            ).first()
         if not tipo_obj:
-            return jsonify({"error": f"No existe un tipo de cuenta con id {tipo_input}"}), 400
-        tipo_id = tipo_obj.tipocuentaid
-    else:
-        # Buscar por nombre o clave tipo (si tu modelo tiene 'clavetipo' además de 'nombre')
-        tipo_obj = TipoCuenta.query.filter(
-            (TipoCuenta.nombre == tipo_input) | (TipoCuenta.clavetipo == tipo_input)
-        ).first()
-
-        if not tipo_obj:
-            return jsonify({"error": f"No existe un tipo de cuenta con nombre o clave '{tipo_input}'"}), 400
-
+            return jsonify({"error": f"No existe un tipo de cuenta '{tipo_input}'"}), 400
         tipo_id = tipo_obj.tipocuentaid
 
-    # -----------------------------
-    # 3️⃣ Crear la nueva validación
-    # -----------------------------
+    # 3️⃣ Nivel puede quedar como None o int
+    nivel_val = nivel_input
+    print(tipo_id)
+    print(nivel_val)
+    # 4️⃣ Crear validación
     nueva_validacion = ValidacionesCtgoCts(
         templateid=templateid,
-        tipo=tipo_id,
-        nivel=nivel,
+        tipo=tipo_id,          # integer o None
+        nivel=nivel_val,       # integer o None
         description=description,
         cuentaobjetivo=cuentaobjetivo,
         expresion=expresion,
         operador=operador,
-        validacion=bool(validacion)
+        validacion=bool(validacion)  # bool está bien
     )
 
     db.session.add(nueva_validacion)
@@ -211,7 +199,8 @@ def crear_validacion():
     return jsonify({
         "message": "Validación creada exitosamente",
         "validacionesid": nueva_validacion.validacionesid,
-        "tipoid": tipo_id
+        "tipoid": tipo_id,
+        "nivel": nivel_val
     }), 201
 # Actualizar validación
 @cuentacontable_bp.route('/api/validaciones/update', methods=['POST'])
