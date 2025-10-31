@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import Template_Balance, Institution, InstitutionTemplate, TempInd
+from app.models import Template_Balance, Institution, InstitutionTemplate, TempInd, CuentaContable, SaldoMensualCTS
 
 template_balance_bp = Blueprint('template_balance_bp', __name__)
 
@@ -143,3 +143,49 @@ def api_list_templates():
             "error": "Error al obtener los templates con sus instituciones",
             "detalle": str(e)
         }), 500
+@template_balance_bp.route('/api/template/delete', methods=['DELETE'])
+def delete_template():
+    data = request.json
+    flagdelete = False
+
+    if not data or 'templateid' not in data:
+        return jsonify({"error": "Se requiere el campo 'templateid'"}), 400
+
+    template = Template_Balance.query.get(data['templateid'])
+    if not template:
+        return jsonify({"error": f"No se encontró el template con ID {data['templateid']}"}), 404
+    
+    # Obtener las cuentas asociadas a este template
+    cuentas = CuentaContable.query.filter_by(templateid=template.templateid).all()
+    if not cuentas:
+        return jsonify({"error": "No hay cuentas asociadas a este template"}), 400
+
+    # Obtener IDs de las cuentas
+    cuenta_ids = [c.cuentaid for c in cuentas]
+
+    # Contar periodos distintos en saldo_balance_cts para estas cuentas
+    periodos_count = db.session.query(
+        SaldoMensualCTS.periodoid
+    ).filter(SaldoMensualCTS.cuentaid.in_(cuenta_ids)).distinct().count()
+
+    if periodos_count > 2:
+        return jsonify({
+            "error": f"No se puede eliminar el template porque tiene {periodos_count} periodos capturados en saldo_balance_cts"
+        }), 400
+    print(periodos_count)
+    """
+    # Contar periodos en la tabla saldos asociados a este template
+    periodos = db.session.query(Saldo.templateid, Saldo.periodo).filter(Saldo.templateid == template.templateid).distinct().count()
+    
+    if periodos > 2:
+        return jsonify({"error": "No se puede eliminar el template porque tiene más de 2 periodos capturados"}), 400
+    
+    try:
+        db.session.delete(template)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Ocurrió un error al eliminar el template", "details": str(e)}), 500
+    """
+    print(template)
+    return jsonify({"message": f"Template con ID {template.templateid} eliminado correctamente"}), 200
