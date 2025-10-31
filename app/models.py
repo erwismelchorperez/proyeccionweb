@@ -91,8 +91,8 @@ class ValidacionesCtgoCts(db.Model):
 
     validacionesid = db.Column(db.Integer, primary_key=True)
     templateid     = db.Column(db.Integer, db.ForeignKey('template_balance.templateid'), nullable=False)
-    tipo           = db.Column(db.Integer, default=True)
-    nivel          = db.Column(db.Integer, default=True)
+    tipo           = db.Column(db.Integer, nullable=True)
+    nivel          = db.Column(db.Integer, nullable=True)
     description    = db.Column(db.Text)
     cuentaobjetivo = db.Column(db.Text)
     expresion      = db.Column(db.Text)
