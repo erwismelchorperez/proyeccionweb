@@ -58,17 +58,31 @@ def listar_tempind():
     """
     Body JSON opcional:
     {
-        "indicadorid": 1
+        "indicadorid": 1,
+        "templateid": 2
     }
     """
     data = request.get_json() or {}
     indicadorid = data.get("indicadorid")
+    templateid = data.get("templateid")
 
+    # Construcción dinámica del query
     query = TempInd.query
-    if indicadorid:
+
+    if indicadorid and templateid:
+        query = query.filter_by(indicadorid=indicadorid, templateid=templateid)
+    elif indicadorid:
         query = query.filter_by(indicadorid=indicadorid)
+    elif templateid:
+        query = query.filter_by(templateid=templateid)
 
     registros = query.all()
+
+    if not registros:
+        return jsonify({
+            "message": "No se encontraron registros con los filtros especificados.",
+            "filters": {"indicadorid": indicadorid, "templateid": templateid}
+        }), 404
 
     return jsonify([
         {
@@ -76,4 +90,4 @@ def listar_tempind():
             "templateid": r.templateid,
             "formula": r.formula
         } for r in registros
-    ])
+    ]), 200
