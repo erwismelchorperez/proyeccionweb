@@ -108,7 +108,7 @@ def listar_indicadores():
     # Si se envía un templateid, listamos solo los indicadores asociados
     elif templateid:
         indicadores = (
-            db.session.query(Indicador)
+            db.session.query(Indicador, TempInd)
             .join(TempInd, TempInd.indicadorid == Indicador.indicadorid)
             .filter(TempInd.templateid == templateid)
             .all()
@@ -116,28 +116,52 @@ def listar_indicadores():
 
         if not indicadores:
             return jsonify({"message": f"No se encontraron indicadores para el templateid '{templateid}'"}), 404
+        
+        # Construimos el resultado usando la fórmula de TempInd si no es nula
+        result = [
+            {
+                "indicadorid": ind.indicadorid,
+                "grupoid": ind.grupoid,
+                "clavepais": ind.clavepais,
+                "indicador": ind.indicador,
+                "descripcion": ind.descripcion,
+                "formula": temp.formula if temp.formula else ind.formula
+            }
+            for ind, temp in indicadores
+        ]
 
     # Si se envía clavepais
     elif clavepais:
         indicadores = Indicador.query.filter_by(clavepais=clavepais, universo=True).all()
         if not indicadores:
             return jsonify({"message": f"No se encontraron indicadores para clavepais '{clavepais}'"}), 404
+        # Construimos el resultado
+        result = [
+            {
+                "indicadorid": i.indicadorid,
+                "grupoid": i.grupoid,
+                "clavepais": i.clavepais,
+                "indicador": i.indicador,
+                "descripcion": i.descripcion,
+                "formula": i.formula
+            } for i in indicadores
+        ]
 
     # Si no hay filtros, retorna todos
     else:
         indicadores = Indicador.query.all()
 
-    # Construimos el resultado
-    result = [
-        {
-            "indicadorid": i.indicadorid,
-            "grupoid": i.grupoid,
-            "clavepais": i.clavepais,
-            "indicador": i.indicador,
-            "descripcion": i.descripcion,
-            "formula": i.formula
-        } for i in indicadores
-    ]
+        # Construimos el resultado
+        result = [
+            {
+                "indicadorid": i.indicadorid,
+                "grupoid": i.grupoid,
+                "clavepais": i.clavepais,
+                "indicador": i.indicador,
+                "descripcion": i.descripcion,
+                "formula": i.formula
+            } for i in indicadores
+        ]
 
     return jsonify(result), 200
 # Servicio para modificar la fórmula del indicador
