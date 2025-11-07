@@ -229,6 +229,7 @@ class Semaforo(db.Model):
     __tablename__ = 'semaforo'
     semaforoid = db.Column(db.Integer, primary_key=True)
     indicadorid = db.Column(db.Integer, db.ForeignKey('indicador.indicadorid'), nullable=False)
+    templateid = db.Column(db.Integer, db.ForeignKey('template_balance.templateid'))  # 👈 NUEVO
     nombre = db.Column(db.String(50), nullable=False)
     limiteinf = db.Column(db.Numeric(10,2), nullable=False)
     limitesup = db.Column(db.Numeric(10,2), nullable=False)

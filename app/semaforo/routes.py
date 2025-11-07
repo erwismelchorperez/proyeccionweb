@@ -4,58 +4,46 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import Indicador, Semaforo
+from app.models import Indicador, Semaforo, Template_Balance
 
 semaforo_bp = Blueprint('semaforo_bp', __name__)
 @semaforo_bp.route('/api/semaforo/create', methods=['POST'])
 def create_semaforo():
     data = request.json
 
-    # ✅ Validar campos principales
-    required_fields = ['indicadorid', 'nombre', 'condiciones']
+    required_fields = ['indicadorid', 'templateid', 'nombre', 'condiciones']
     missing = [f for f in required_fields if f not in data]
     if missing:
         return jsonify({"error": f"Faltan campos requeridos: {', '.join(missing)}"}), 400
 
-    # ✅ Verificar que el indicador exista
     indicador = Indicador.query.get(data['indicadorid'])
     if not indicador:
         return jsonify({"error": "El indicador no existe"}), 404
 
-    condiciones = data['condiciones']
+    template = Template_Balance.query.get(data['templateid'])
+    if not template:
+        return jsonify({"error": "El template no existe"}), 404
 
-    # ✅ Validar lista de condiciones
+    condiciones = data['condiciones']
     if not isinstance(condiciones, list) or len(condiciones) == 0:
         return jsonify({"error": "El campo 'condiciones' debe ser una lista con al menos un elemento"}), 400
-
-    # 🚫 Máximo 6 condiciones
     if len(condiciones) > 6:
         return jsonify({"error": "Solo se permiten hasta 6 condiciones"}), 400
 
-    # ✅ Validar estructura interna de cada condición
-    for i, cond in enumerate(condiciones):
-        color = cond.get("color")
-        reglas = cond.get("reglas")
+    # Evitar duplicado por indicador y template
+    existente = Semaforo.query.filter_by(
+        indicadorid=data['indicadorid'],
+        templateid=data['templateid']
+    ).first()
 
-        if not color:
-            return jsonify({"error": f"Falta el campo 'color' en la condición {i+1}"}), 400
-        if not reglas or not isinstance(reglas, list):
-            return jsonify({"error": f"La condición {i+1} debe tener una lista de 'reglas'"}), 400
+    if existente:
+        return jsonify({"error": "Ya existe un semáforo para este indicador y template"}), 400
 
-        for j, r in enumerate(reglas):
-            # Validar que existan las claves necesarias, aunque sus valores puedan ser null
-            if not all(k in r for k in ('rangomin', 'rangomax', 'operadores')):
-                return jsonify({"error": f"Faltan campos en la regla {j+1} de la condición {i+1}"}), 400
-
-            operadores = r.get("operadores")
-            if not isinstance(operadores, list) or len(operadores) != 2:
-                return jsonify({"error": f"La regla {j+1} de la condición {i+1} debe tener exactamente 2 operadores"}), 400
-
-    # ✅ Crear nuevo registro
     semaforo = Semaforo(
         indicadorid=data['indicadorid'],
+        templateid=data['templateid'],
         nombre=data['nombre'],
-        condiciones=condiciones,  # 👈 Guardamos el JSON completo sin modificar
+        condiciones=condiciones,
         limiteinf=data.get('limiteinferior'),
         limitesup=data.get('limitesuperior')
     )
@@ -63,44 +51,54 @@ def create_semaforo():
     db.session.add(semaforo)
     db.session.commit()
 
-    # ✅ Respuesta
     return jsonify({
         "semaforoid": semaforo.semaforoid,
         "indicadorid": semaforo.indicadorid,
+        "templateid": semaforo.templateid,
         "nombre": semaforo.nombre,
-        "condiciones": semaforo.condiciones,  # Se regresa igual al insertado
-        "limiteinferior": semaforo.limiteinf,
-        "limitesuperior": semaforo.limitesup
+        "condiciones": semaforo.condiciones
     }), 201
-
-
-# 📌 Listar semáforos de un indicador
 @semaforo_bp.route('/api/semaforo/listar', methods=['POST'])
 def listar_semaforos():
-    data = request.json
+    data = request.json or {}
 
-    if not data or 'indicadorid' not in data:
-        return jsonify({"error": "Se requiere el campo 'indicadorid'"}), 400
+    indicadorid = data.get("indicadorid")
+    templateid = data.get("templateid")
 
-    indicador = Indicador.query.get(data['indicadorid'])
-    if not indicador:
-        return jsonify({"error": "El indicador no existe"}), 404
+    # ✅ Validar que al menos uno venga
+    if not indicadorid and not templateid:
+        return jsonify({"error": "Se requiere 'indicadorid' o 'templateid'"}), 400
 
-    semaforos = Semaforo.query.filter_by(indicadorid=data['indicadorid']).all()
+    # 🔹 Si se envía templateid, filtramos por él
+    if templateid:
+        semaforos = Semaforo.query.filter_by(templateid=templateid).all()
+        if not semaforos:
+            return jsonify({"message": f"No hay semáforos registrados para el templateid {templateid}"}), 404
 
-    if not semaforos:
-        return jsonify({"message": "No hay semáforos registrados para este indicador"}), 404
+    # 🔹 Si no se envía templateid, filtramos por indicadorid
+    elif indicadorid:
+        indicador = Indicador.query.get(indicadorid)
+        if not indicador:
+            return jsonify({"error": f"No se encontró el indicador con id {indicadorid}"}), 404
 
-    return jsonify([
+        semaforos = Semaforo.query.filter_by(indicadorid=indicadorid).all()
+        if not semaforos:
+            return jsonify({"message": f"No hay semáforos registrados para el indicadorid {indicadorid}"}), 404
+
+    # ✅ Construir respuesta
+    result = [
         {
             "semaforoid": s.semaforoid,
             "indicadorid": s.indicadorid,
+            "templateid": s.templateid,
             "nombre": s.nombre,
             "condiciones": s.condiciones,
             "limiteinferior": s.limiteinf,
             "limitesuperior": s.limitesup
         } for s in semaforos
-    ]), 200
+    ]
+
+    return jsonify(result), 200
 @semaforo_bp.route('/api/semaforo/update', methods=['POST'])
 def update_semaforo():
     data = request.json
@@ -111,6 +109,13 @@ def update_semaforo():
     semaforo = Semaforo.query.get(data['semaforoid'])
     if not semaforo:
         return jsonify({"error": "No se encontró el semáforo con el ID especificado"}), 404
+
+    # ✅ Validar templateid si viene
+    templateid = data.get('templateid')
+    if templateid:
+        template = Template_Balance.query.get(templateid)
+        if not template:
+            return jsonify({"error": f"No existe el template con ID {templateid}"}), 404
 
     # ✅ Validar condiciones si vienen
     condiciones = data.get('condiciones')
@@ -138,6 +143,7 @@ def update_semaforo():
     semaforo.condiciones = condiciones or semaforo.condiciones
     semaforo.limiteinf = data.get('limiteinferior', semaforo.limiteinf)
     semaforo.limitesup = data.get('limitesuperior', semaforo.limitesup)
+    semaforo.templateid = templateid or semaforo.templateid  # 👈 NUEVO
 
     db.session.commit()
 
@@ -145,6 +151,7 @@ def update_semaforo():
         "message": "Semáforo actualizado correctamente",
         "semaforoid": semaforo.semaforoid,
         "nombre": semaforo.nombre,
+        "templateid": semaforo.templateid,
         "condiciones": semaforo.condiciones,
         "limiteinferior": semaforo.limiteinf,
         "limitesuperior": semaforo.limitesup
