@@ -103,6 +103,7 @@ def listar_semaforos():
 def update_semaforo():
     data = request.json
 
+    # Validar que venga semaforoid
     if not data or 'semaforoid' not in data:
         return jsonify({"error": "Se requiere el campo 'semaforoid'"}), 400
 
@@ -110,48 +111,61 @@ def update_semaforo():
     if not semaforo:
         return jsonify({"error": "No se encontró el semáforo con el ID especificado"}), 404
 
-    # ✅ Validar templateid si viene
-    templateid = data.get('templateid')
-    if templateid:
-        template = Template_Balance.query.get(templateid)
-        if not template:
-            return jsonify({"error": f"No existe el template con ID {templateid}"}), 404
+    # Si viene indicadorid o templateid hay que validar que existan
+    if 'indicadorid' in data:
+        indicador = Indicador.query.get(data['indicadorid'])
+        if not indicador:
+            return jsonify({"error": "El indicador no existe"}), 404
+        semaforo.indicadorid = data['indicadorid']
 
-    # ✅ Validar condiciones si vienen
+    if 'templateid' in data:
+        template = Template_Balance.query.get(data['templateid'])
+        if not template:
+            return jsonify({"error": "El template no existe"}), 404
+        semaforo.templateid = data['templateid']
+
+    # Validar condiciones si vienen
     condiciones = data.get('condiciones')
-    if condiciones:
+    if condiciones is not None:
+
         if not isinstance(condiciones, list):
             return jsonify({"error": "El campo 'condiciones' debe ser una lista"}), 400
         if len(condiciones) > 6:
             return jsonify({"error": "Solo se permiten hasta 6 condiciones por semáforo"}), 400
 
-        # ✅ Validación de estructura de cada condición
-        for i, c in enumerate(condiciones):
-            if not all(k in c for k in ('rangomin', 'rangomax', 'operadores', 'color')):
-                return jsonify({
-                    "error": f"Faltan campos en condición {i+1}. "
-                             f"Se requiere 'rangomin', 'rangomax', 'operadores' y 'color'"
-                }), 400
+        # Validar cada condición
+        for i, cond in enumerate(condiciones):
+            if "color" not in cond:
+                return jsonify({"error": f"Falta el campo 'color' en la condición {i+1}"}), 400
 
-            if len(c['operadores']) != 2:
-                return jsonify({
-                    "error": f"La condición {i+1} debe tener exactamente 2 operadores"
-                }), 400
+            if "reglas" not in cond or not isinstance(cond["reglas"], list):
+                return jsonify({"error": f"La condición {i+1} debe contener una lista 'reglas'"}), 400
 
-    # ✅ Actualizar campos
-    semaforo.nombre = data.get('nombre', semaforo.nombre)
-    semaforo.condiciones = condiciones or semaforo.condiciones
-    semaforo.limiteinf = data.get('limiteinferior', semaforo.limiteinf)
-    semaforo.limitesup = data.get('limitesuperior', semaforo.limitesup)
-    semaforo.templateid = templateid or semaforo.templateid  # 👈 NUEVO
+            for j, r in enumerate(cond["reglas"]):
+                if not all(k in r for k in ("rangomin", "rangomax", "operadores")):
+                    return jsonify({"error": f"Faltan campos en la regla {j+1} de la condición {i+1}"}), 400
+
+                operadores = r.get("operadores")
+                if not isinstance(operadores, list) or len(operadores) != 2:
+                    return jsonify({"error": f"La regla {j+1} de la condición {i+1} debe tener 2 operadores"}), 400
+
+        semaforo.condiciones = condiciones
+
+    # Actualizar otros campos opcionales
+    if "nombre" in data:
+        semaforo.nombre = data["nombre"]
+
+    semaforo.limiteinf = data.get("limiteinferior", semaforo.limiteinf)
+    semaforo.limitesup = data.get("limitesuperior", semaforo.limitesup)
 
     db.session.commit()
 
     return jsonify({
         "message": "Semáforo actualizado correctamente",
         "semaforoid": semaforo.semaforoid,
-        "nombre": semaforo.nombre,
+        "indicadorid": semaforo.indicadorid,
         "templateid": semaforo.templateid,
+        "nombre": semaforo.nombre,
         "condiciones": semaforo.condiciones,
         "limiteinferior": semaforo.limiteinf,
         "limitesuperior": semaforo.limitesup
