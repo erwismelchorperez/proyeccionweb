@@ -101,20 +101,30 @@ def subirtemplate(id):
 """
     Apartado que regresará todo lo de postman en fomrato JSON
 """
-@institutions_bp.route('/institucionesListar', methods=['GET','POST'])
+@institutions_bp.route('/institucionesListar', methods=['GET', 'POST'])
 def listarInstituciones():
-    if request.method=='GET':
-        institution_id=request.args.get("institutionid",type=int)
+    # Obtener parámetros según GET o POST
+    if request.method == 'GET':
+        institution_id = request.args.get("institutionid", type=int)
+        _id = request.args.get("_id", type=str)   # <-- soporte GET para _id
     else:
         data = request.get_json(silent=True) or {}
         institution_id = data.get('institutionid')
-    # Si se pasa institutionid → filtra
-    if institution_id:
-        instituciones = Institution.query.filter_by(institutionid=institution_id).all()
-    else:
-        # Si no se pasa → devuelve todas
-        instituciones = Institution.query.all()
+        _id = data.get('_id')                    # <-- soporte POST para _id
 
+    query = Institution.query
+
+    # Aplicar filtros si vienen
+    if institution_id:
+        query = query.filter_by(institutionid=institution_id)
+
+    if _id:
+        query = query.filter_by(_id=_id)
+
+    # Ejecutar consulta
+    instituciones = query.all()
+
+    # Armar respuesta
     result = []
     for inst in instituciones:
         result.append({
@@ -128,6 +138,7 @@ def listarInstituciones():
         })
     
     return jsonify(result)
+
 @institutions_bp.route("/api/instituciones", methods=["GET"])
 def obtener_empresas():
     try:
