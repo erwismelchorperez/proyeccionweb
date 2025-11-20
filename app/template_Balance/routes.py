@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import Template_Balance, Institution, InstitutionTemplate, TempInd, CuentaContable, SaldoMensualCTS
+from app.models import Template_Balance, Institution, InstitutionTemplate, TempInd, CuentaContable, SaldoMensualCTS, Semaforo
 
 template_balance_bp = Blueprint('template_balance_bp', __name__)
 
@@ -145,47 +145,66 @@ def api_list_templates():
         }), 500
 @template_balance_bp.route('/api/template/delete', methods=['DELETE'])
 def delete_template():
-    data = request.json
-    flagdelete = False
+    data = request.get_json() or {}
 
-    if not data or 'templateid' not in data:
+    # Validación del campo requerido
+    if "templateid" not in data:
         return jsonify({"error": "Se requiere el campo 'templateid'"}), 400
 
-    template = Template_Balance.query.get(data['templateid'])
+    template_id = data["templateid"]
+
+    # 1. Verificar que el template exista
+    template = Template_Balance.query.get(template_id)
     if not template:
-        return jsonify({"error": f"No se encontró el template con ID {data['templateid']}"}), 404
-    
-    # Obtener las cuentas asociadas a este template
-    cuentas = CuentaContable.query.filter_by(templateid=template.templateid).all()
-    if not cuentas:
-        return jsonify({"error": "No hay cuentas asociadas a este template"}), 400
+        return jsonify({"error": "El template no existe"}), 404
 
-    # Obtener IDs de las cuentas
-    cuenta_ids = [c.cuentaid for c in cuentas]
-
-    # Contar periodos distintos en saldo_balance_cts para estas cuentas
-    periodos_count = db.session.query(
-        SaldoMensualCTS.periodoid
-    ).filter(SaldoMensualCTS.cuentaid.in_(cuenta_ids)).distinct().count()
-
-    if periodos_count > 2:
+    # 2. Validar relación con TempInd (indicadores asignados)
+    relacionados_tempind = TempInd.query.filter_by(templateid=template_id).count()
+    if relacionados_tempind > 0:
         return jsonify({
-            "error": f"No se puede eliminar el template porque tiene {periodos_count} periodos capturados en saldo_balance_cts"
+            "error": "No se puede eliminar el template porque está asociado a indicadores.",
+            "detalle": f"Indicadores relacionados: {relacionados_tempind}"
         }), 400
-    print(periodos_count)
-    """
-    # Contar periodos en la tabla saldos asociados a este template
-    periodos = db.session.query(Saldo.templateid, Saldo.periodo).filter(Saldo.templateid == template.templateid).distinct().count()
-    
-    if periodos > 2:
-        return jsonify({"error": "No se puede eliminar el template porque tiene más de 2 periodos capturados"}), 400
-    
+
+    # 3. Validar cuentas contables relacionadas
+    cuentas = CuentaContable.query.filter_by(templateid=template_id).all()
+
+    if cuentas:
+        # Revisar si esas cuentas tienen saldos
+        cuenta_ids = [c.cuentaid for c in cuentas]
+
+        periodos_saldos = db.session.query(
+            SaldoMensualCTS.periodo
+        ).filter(
+            SaldoMensualCTS.cuentaid.in_(cuenta_ids)
+        ).distinct().count()
+
+        if periodos_saldos > 0:
+            return jsonify({
+                "error": "No se puede eliminar el template porque las cuentas tienen saldos registrados.",
+                "periodos_registrados": periodos_saldos
+            }), 400
+
+    # 4. Validar semáforos asociados
+    semaforos = Semaforo.query.filter_by(templateid=template_id).count()
+    if semaforos > 0:
+        return jsonify({
+            "error": "No se puede eliminar el template porque tiene semáforos configurados.",
+            "semaforos_relacionados": semaforos
+        }), 400
+
+    # 5. Si pasa todas las validaciones → eliminar template
     try:
         db.session.delete(template)
         db.session.commit()
+
+        return jsonify({
+            "message": f"Template {template_id} eliminado correctamente"
+        }), 200
+
     except Exception as e:
         db.session.rollback()
-        return jsonify({"error": "Ocurrió un error al eliminar el template", "details": str(e)}), 500
-    """
-    print(template)
-    return jsonify({"message": f"Template con ID {template.templateid} eliminado correctamente"}), 200
+        return jsonify({
+            "error": "Error interno al intentar eliminar el template",
+            "detalle": str(e)
+        }), 500
