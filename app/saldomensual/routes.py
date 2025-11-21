@@ -342,3 +342,73 @@ def api_obtener_periodos_por_template():
         "templateid": templateid,
         "periodos": periodos_por_anio
     }), 200
+@saldo_mensual_cts_bp.route('/api/saldos/aniomes', methods=['POST'])
+def api_obtener_saldos_por_periodo():
+    data = request.get_json()
+
+    # Validación de campos requeridos
+    campos_requeridos = ("institutionid", "sucursalid", "anio", "mes")
+    if not data or not all(k in data for k in campos_requeridos):
+        return jsonify({"error": "institutionid, sucursalid, anio y mes son requeridos"}), 400
+
+    institutionid = data["institutionid"]
+    sucursalid    = data["sucursalid"]
+    anio          = data["anio"]
+    mes           = data["mes"]
+
+    # 1️⃣ Obtener template activo mediante institucion_balance
+    relacion = InstitutionTemplate.query.filter_by(
+        institutionid=institutionid,
+        activo=True
+    ).first()
+
+    if not relacion:
+        return jsonify({"error": "La institución no tiene template activo registrado"}), 400
+
+    template = Template_Balance.query.filter_by(templateid=relacion.templateid).first()
+
+    if not template:
+        return jsonify({"error": "El template activo no existe"}), 400
+
+    # 2️⃣ Buscar periodo específico
+    periodo = Periodo.query.filter_by(anio=anio, mes=mes).first()
+
+    if not periodo:
+        return jsonify({"error": "El periodo especificado no existe"}), 404
+
+    # 3️⃣ Buscar saldos para ese periodo, sucursal y template
+    saldos = (
+        db.session.query(SaldoMensualCTS, CuentaContable)
+        .join(CuentaContable, CuentaContable.cuentaid == SaldoMensualCTS.cuentaid)
+        .filter(
+            CuentaContable.templateid == template.templateid,
+            SaldoMensualCTS.periodoid == periodo.periodoid,
+            SaldoMensualCTS.sucursalid == sucursalid
+        )
+        .all()
+    )
+
+    if not saldos:
+        return jsonify({"error": "No existen saldos registrados para ese periodo y sucursal"}), 404
+
+    registros = []
+    for saldo, cuenta in saldos:
+        registros.append({
+            "codigo": cuenta.codigo,
+            "nombre": cuenta.nombre,
+            "saldo": float(saldo.saldo),
+            "cuentaid": cuenta.cuentaid
+        })
+
+    return jsonify({
+        "message": "Saldos del periodo solicitado",
+        "institutionid": institutionid,
+        "sucursalid": sucursalid,
+        "templateid": template.templateid,
+        "periodo": {
+            "periodoid": periodo.periodoid,
+            "anio": periodo.anio,
+            "mes": periodo.mes,
+            "saldos": registros
+        }
+    }), 200
