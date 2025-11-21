@@ -23,7 +23,8 @@ def api_lista_sucursales():
             "sucursalid": suc.sucursalid,
             "institutionid": suc.institutionid,
             "codigo": suc.codigo,
-            "nombre": suc.nombre
+            "nombre": suc.nombre,
+            "consolidado": suc.consolidado
         }
         for suc in sucursales
     ])
