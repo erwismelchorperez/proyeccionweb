@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import Template_Balance, Institution, InstitutionTemplate, TempInd, CuentaContable, SaldoMensualCTS, Semaforo
+from app.models import Template_Balance, Institution, InstitutionTemplate, TempInd, CuentaContable, SaldoMensualCTS, Semaforo, ValorIndicador, ValorVariable, TempVar, Periodo
 
 template_balance_bp = Blueprint('template_balance_bp', __name__)
 
@@ -159,32 +159,67 @@ def delete_template():
         return jsonify({"error": "El template no existe"}), 404
 
     # 2. Validar relación con TempInd (indicadores asignados)
-    relacionados_tempind = TempInd.query.filter_by(templateid=template_id).count()
-    if relacionados_tempind > 0:
+    tempind_rel = TempInd.query.filter_by(templateid=template_id).all()
+    if tempind_rel:
+        # Obtener lista de ids de indicadores asociados al template
+        indicador_ids = [ti.indicadorid for ti in tempind_rel]
+
+        # Validar registros en valorIndicador
+        registros_valor_ind = db.session.query(ValorIndicador) \
+            .filter(ValorIndicador.indicadorid.in_(indicador_ids)) \
+            .count()
+
+        if registros_valor_ind > 0:
+            return jsonify({
+                "error": "No se puede eliminar el template porque sus indicadores tienen datos registrados.",
+                "detalle": f"Registros en valorIndicador: {registros_valor_ind}"
+            }), 400
+        """
+        # Si NO tiene registros en valorIndicador pero sí tiene indicadores, avisar igual
         return jsonify({
             "error": "No se puede eliminar el template porque está asociado a indicadores.",
-            "detalle": f"Indicadores relacionados: {relacionados_tempind}"
+            "detalle": f"Indicadores relacionados: {len(indicador_ids)}"
         }), 400
+        """
 
+    
     # 3. Validar cuentas contables relacionadas
     cuentas = CuentaContable.query.filter_by(templateid=template_id).all()
 
     if cuentas:
-        # Revisar si esas cuentas tienen saldos
         cuenta_ids = [c.cuentaid for c in cuentas]
 
-        periodos_saldos = db.session.query(
-            SaldoMensualCTS.periodo
+        # Buscar periodos usados en saldos
+        periodos_en_saldos = db.session.query(
+            SaldoMensualCTS.periodoid
         ).filter(
             SaldoMensualCTS.cuentaid.in_(cuenta_ids)
-        ).distinct().count()
+        ).distinct().all()
 
-        if periodos_saldos > 0:
+        if periodos_en_saldos:
+            # Extraer IDs como lista simple
+            periodo_ids = [p[0] for p in periodos_en_saldos]
+
+            # Ahora consultar detalles en la tabla Periodo
+            periodos_detalle = Periodo.query.filter(
+                Periodo.periodoid.in_(periodo_ids)
+            ).all()
+
+            # Preparar detalle amigable
+            lista_periodos = [
+                {
+                    "periodoid": p.periodoid,
+                    "anio": p.anio,
+                    "mes": p.mes
+                } for p in periodos_detalle
+            ]
+
             return jsonify({
                 "error": "No se puede eliminar el template porque las cuentas tienen saldos registrados.",
-                "periodos_registrados": periodos_saldos
+                "periodos_registrados": lista_periodos,
+                "total_periodos": len(lista_periodos)
             }), 400
-
+    """
     # 4. Validar semáforos asociados
     semaforos = Semaforo.query.filter_by(templateid=template_id).count()
     if semaforos > 0:
@@ -192,8 +227,33 @@ def delete_template():
             "error": "No se puede eliminar el template porque tiene semáforos configurados.",
             "semaforos_relacionados": semaforos
         }), 400
+    """    
+    # 5. Validar variables relacionadas al template
+    variables_rel = TempVar.query.filter_by(templateid=template_id).all()
+    if variables_rel:
+        # Obtener ids de variables asociadas
+        variable_ids = [v.variableid for v in variables_rel]
 
-    # 5. Si pasa todas las validaciones → eliminar template
+        # Validar si esas variables tienen registros en valorVariable
+        registros_valor_variable = db.session.query(ValorVariable) \
+            .filter(ValorVariable.variableid.in_(variable_ids)) \
+            .count()
+
+        if registros_valor_variable > 0:
+            return jsonify({
+                "error": "No se puede eliminar el template porque sus variables tienen datos registrados.",
+                "detalle": f"Registros en valorVariable: {registros_valor_variable}"
+            }), 400
+
+        """
+        # Si tienen variables pero no valorVariable → aun así prohibimos la eliminación
+        return jsonify({
+            "error": "No se puede eliminar el template porque tiene variables asociadas.",
+            "detalle": f"Variables relacionadas: {len(variable_ids)}"
+        }), 400
+        """
+
+    # 6. Si pasa todas las validaciones → eliminar template
     try:
         db.session.delete(template)
         db.session.commit()

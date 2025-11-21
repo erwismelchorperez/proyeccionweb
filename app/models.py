@@ -64,10 +64,19 @@ class InstitutionTemplate(db.Model):
     __table_args__ = (db.UniqueConstraint('institutionid', 'templateid', name='uq_institution_template'),)
 class Template_Balance(db.Model):
     __tablename__ = 'template_balance'
+
     templateid = db.Column(db.Integer, primary_key=True)
     nombre = db.Column(db.String(200), nullable=False)
     descripcion = db.Column(db.String(250), nullable=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+    # Nombre consistente: "validaciones"
+    validaciones = db.relationship(
+        'ValidacionesCtgoCts',
+        back_populates='template',
+        passive_deletes=True,
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<Template_Balance {self.nombre}>"
@@ -90,16 +99,25 @@ class ValidacionesCtgoCts(db.Model):
     __tablename__ = 'validacionesctgocts'
 
     validacionesid = db.Column(db.Integer, primary_key=True)
-    templateid     = db.Column(db.Integer, db.ForeignKey('template_balance.templateid'), nullable=False)
-    tipo           = db.Column(db.Integer, nullable=True)
-    nivel          = db.Column(db.Integer, nullable=True)
+    templateid     = db.Column(
+        db.Integer,
+        db.ForeignKey('template_balance.templateid', ondelete="CASCADE"),
+        nullable=False
+    )
+
+    tipo           = db.Column(db.Integer)
+    nivel          = db.Column(db.Integer)
     description    = db.Column(db.Text)
     cuentaobjetivo = db.Column(db.Text)
     expresion      = db.Column(db.Text)
     operador       = db.Column(db.Text)
     validacion     = db.Column(db.Boolean, default=True)
 
-    template = db.relationship('Template_Balance', backref='validaciones')
+    # Nombre consistente: "template"
+    template = db.relationship(
+        'Template_Balance',
+        back_populates='validaciones'
+    )
 
     def to_dict(self):
         return {
