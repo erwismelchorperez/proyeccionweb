@@ -291,3 +291,54 @@ def api_obtener_periodos_por_anio():
             periodos_por_anio[anio].append(p.mes)
 
     return jsonify(periodos_por_anio), 200
+@saldo_mensual_cts_bp.route('/api/saldos/periodos/template', methods=['POST'])
+def api_obtener_periodos_por_template():
+    data = request.get_json()
+
+    # Validar campos recibidos
+    for field in data.keys():
+        if field not in {"templateid"}:
+            return jsonify({"error": "templateid son requeridos"}), 400
+
+    templateid = data["templateid"]
+
+    # 1️⃣ Verificar la existencia del template
+    template = Template_Balance.query.filter_by(templateid=templateid).first()
+    if not template:
+        return jsonify({"error": "El template no existe"}), 404
+
+    # 2️⃣ Buscar periodos donde existan saldos relacionados a este template y sucursal
+    periodos = (
+        db.session.query(Periodo)
+        .join(SaldoMensualCTS, SaldoMensualCTS.periodoid == Periodo.periodoid)
+        .join(CuentaContable, CuentaContable.cuentaid == SaldoMensualCTS.cuentaid)
+        .filter(
+            CuentaContable.templateid == templateid
+        )
+        .order_by(Periodo.anio.asc(), Periodo.mes.asc())
+        .all()
+    )
+
+    # Si no existen periodos → entonces el template NO tiene saldos
+    if not periodos:
+        return jsonify({
+            "error": "El template no tiene saldos registrados",
+            "templateid": templateid
+        }), 404
+
+    # 3️⃣ Agrupar meses por año
+    periodos_por_anio = {}
+
+    for p in periodos:
+        anio = str(p.anio)
+
+        if anio not in periodos_por_anio:
+            periodos_por_anio[anio] = []
+
+        if p.mes not in periodos_por_anio[anio]:
+            periodos_por_anio[anio].append(p.mes)
+
+    return jsonify({
+        "templateid": templateid,
+        "periodos": periodos_por_anio
+    }), 200
