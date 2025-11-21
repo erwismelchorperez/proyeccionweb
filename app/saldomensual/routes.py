@@ -237,3 +237,57 @@ def api_obtener_todos_saldos():
         "templateid": template.templateid,
         "periodos": respuesta_periodos
     }), 200
+@saldo_mensual_cts_bp.route('/api/saldos/periodos', methods=['POST'])
+def api_obtener_periodos_por_anio():
+    data = request.get_json()
+
+    if not data or not all(k in data for k in ("institutionid", "sucursalid")):
+        return jsonify({"error": "institutionid y sucursalid son requeridos"}), 400
+
+    institutionid = data["institutionid"]
+    sucursalid    = data["sucursalid"]
+
+    # 1️⃣ Obtener template activo mediante institucion_balance
+    relacion = InstitutionTemplate.query.filter_by(
+        institutionid=institutionid,
+        activo=True
+    ).first()
+
+    if not relacion:
+        return jsonify({"error": "La institución no tiene template activo registrado"}), 400
+
+    template = Template_Balance.query.filter_by(templateid=relacion.templateid).first()
+
+    if not template:
+        return jsonify({"error": "El template activo no existe"}), 400
+
+    # 2️⃣ Obtener todos los periodos donde existan saldos para la sucursal
+    periodos = (
+        db.session.query(Periodo)
+        .join(SaldoMensualCTS, SaldoMensualCTS.periodoid == Periodo.periodoid)
+        .join(CuentaContable, CuentaContable.cuentaid == SaldoMensualCTS.cuentaid)
+        .filter(
+            CuentaContable.templateid == template.templateid,
+            SaldoMensualCTS.sucursalid == sucursalid
+        )
+        .order_by(Periodo.anio.asc(), Periodo.mes.asc())
+        .all()
+    )
+
+    if not periodos:
+        return jsonify({"error": "No existen periodos registrados para esta sucursal"}), 404
+
+    # 3️⃣ Agrupar por año
+    periodos_por_anio = {}
+
+    for p in periodos:
+        anio = str(p.anio)
+
+        if anio not in periodos_por_anio:
+            periodos_por_anio[anio] = []
+
+        # Evitar meses duplicados
+        if p.mes not in periodos_por_anio[anio]:
+            periodos_por_anio[anio].append(p.mes)
+
+    return jsonify(periodos_por_anio), 200
