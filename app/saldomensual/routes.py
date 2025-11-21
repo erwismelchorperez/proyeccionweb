@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import SaldoMensualCTS, Template_Balance, CuentaContable, Periodo, Modelo, SucursalTemplate
+from app.models import SaldoMensualCTS, Template_Balance, CuentaContable, Periodo, Modelo, SucursalTemplate, InstitutionTemplate
 
 saldo_mensual_cts_bp = Blueprint('saldo_mensual_cts_bp', __name__)
 
@@ -158,4 +158,82 @@ def api_obtener_ultimo_saldo():
         "anio": ultimo_periodo.anio,
         "mes": ultimo_periodo.mes,
         "saldos": registros
+    }), 200
+@saldo_mensual_cts_bp.route('/api/saldos/all', methods=['POST'])
+def api_obtener_todos_saldos():
+    data = request.get_json()
+
+    if not data or not all(k in data for k in ("institutionid", "sucursalid")):
+        return jsonify({"error": "institutionid y sucursalid son requeridos"}), 400
+
+    institutionid = data["institutionid"]
+    sucursalid    = data["sucursalid"]
+
+    # 1️⃣ Obtener template activo mediante institucion_balance
+    relacion = InstitutionTemplate.query.filter_by(
+        institutionid=institutionid,
+        activo=True
+    ).first()
+
+    if not relacion:
+        return jsonify({"error": "La institución no tiene template activo registrado"}), 400
+
+    template = Template_Balance.query.filter_by(templateid=relacion.templateid).first()
+
+    if not template:
+        return jsonify({"error": "El template activo no existe"}), 400
+
+    # 2️⃣ Buscar todos los periodos donde existan saldos de esa sucursal
+    periodos = (
+        db.session.query(Periodo)
+        .join(SaldoMensualCTS, SaldoMensualCTS.periodoid == Periodo.periodoid)
+        .join(CuentaContable, CuentaContable.cuentaid == SaldoMensualCTS.cuentaid)
+        .filter(
+            CuentaContable.templateid == template.templateid,
+            SaldoMensualCTS.sucursalid == sucursalid
+        )
+        .order_by(Periodo.anio.desc(), Periodo.mes.desc())
+        .all()
+    )
+
+    if not periodos:
+        return jsonify({"error": "No existen saldos registrados para esta sucursal"}), 404
+
+    respuesta_periodos = []
+
+    # 3️⃣ Recorrer cada periodo y traer sus saldos
+    for periodo in periodos:
+        saldos = (
+            db.session.query(SaldoMensualCTS, CuentaContable)
+            .join(CuentaContable, CuentaContable.cuentaid == SaldoMensualCTS.cuentaid)
+            .filter(
+                CuentaContable.templateid == template.templateid,
+                SaldoMensualCTS.periodoid == periodo.periodoid,
+                SaldoMensualCTS.sucursalid == sucursalid
+            )
+            .all()
+        )
+
+        registros = []
+        for saldo, cuenta in saldos:
+            registros.append({
+                "codigo": cuenta.codigo,
+                "nombre": cuenta.nombre,
+                "saldo": float(saldo.saldo),
+                "cuentaid": cuenta.cuentaid
+            })
+
+        respuesta_periodos.append({
+            "periodoid": periodo.periodoid,
+            "anio": periodo.anio,
+            "mes": periodo.mes,
+            "saldos": registros
+        })
+
+    return jsonify({
+        "message": "Listado de saldos por periodo",
+        "institutionid": institutionid,
+        "sucursalid": sucursalid,
+        "templateid": template.templateid,
+        "periodos": respuesta_periodos
     }), 200
