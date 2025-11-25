@@ -8,81 +8,89 @@ from app.models import SaldoMensualCTS, Template_Balance, CuentaContable, Period
 
 saldo_mensual_cts_bp = Blueprint('saldo_mensual_cts_bp', __name__)
 
-@saldo_mensual_cts_bp.route('/api/Createsaldos', methods=['POST'])
+@saldo_mensual_cts_bp.route('/api/Createsaldos', methods=['POST', 'GET'])
 def api_crear_saldos():
-    data = request.get_json()
 
-    # Validar campos mínimos
-    if not data or not all(k in data for k in ("institutionid", "sucursalid", "anio", "mes", "saldos")):
-        return jsonify({"error": "institutionid, sucursalid, anio, mes y saldos son requeridos"}), 400
+    # Si es GET devolvemos un mensaje o datos
+    if request.method == 'GET':
+        return jsonify({
+            "message": "Endpoint activo. Usa POST para enviar saldos."
+        }), 200
 
-    institutionid = data["institutionid"]
-    sucursalid = data["sucursalid"]
-    anio       = data["anio"]
-    mes        = data["mes"]
-    saldos     = data["saldos"]
+    # Si es POST procesamos el JSON
+    if request.method == 'POST':
+        data = request.get_json()
 
-    # 1️⃣ Verificar que el periodo exista
-    periodo = Periodo.query.filter_by(anio=anio, mes=mes).first()
-    if not periodo:
-        return jsonify({"error": f"No existe un periodo registrado para {anio}-{mes}"}), 400
+        # Validar campos mínimos
+        if not data or not all(k in data for k in ("institutionid", "sucursalid", "anio", "mes", "saldos")):
+            return jsonify({"error": "institutionid, sucursalid, anio, mes y saldos son requeridos"}), 400
 
-    # 2️⃣ Template activo de la institution
-    template = InstitutionTemplate.query.filter_by(institutionid=institutionid, activo=True).first()
-    if not template:
-        return jsonify({"error": "No existe template activo para esta institution"}), 400
+        institutionid = data["institutionid"]
+        sucursalid = data["sucursalid"]
+        anio       = data["anio"]
+        mes        = data["mes"]
+        saldos     = data["saldos"]
 
-    # 3️⃣ Cuentas válidas del template
-    cuentas = CuentaContable.query.filter_by(templateid=template.templateid).all()
-    cuentas_dict = {c.codigo: c for c in cuentas}
-    if not cuentas_dict:
-        return jsonify({"error": "El template activo no tiene cuentas contables"}), 400
+        # 1️⃣ Verificar periodo
+        periodo = Periodo.query.filter_by(anio=anio, mes=mes).first()
+        if not periodo:
+            return jsonify({"error": f"No existe un periodo registrado para {anio}-{mes}"}), 400
 
-    registros_insertados = []
+        # 2️⃣ Template activo
+        template = InstitutionTemplate.query.filter_by(institutionid=institutionid, activo=True).first()
+        if not template:
+            return jsonify({"error": "No existe template activo para esta institución"}), 400
 
-    # 4️⃣ Procesar cada saldo
-    for item in saldos:
-        codigo = item.get("codigo")
-        nombre = item.get("nombre")
-        monto  = item.get("saldo")
+        # 3️⃣ Cuentas válidas
+        cuentas = CuentaContable.query.filter_by(templateid=template.templateid).all()
+        cuentas_dict = {c.codigo: c for c in cuentas}
+        if not cuentas_dict:
+            return jsonify({"error": "El template activo no tiene cuentas contables"}), 400
 
-        if not codigo or monto is None:
-            return jsonify({"error": "Cada saldo debe incluir 'codigo' y 'saldo'"}), 400
+        registros_insertados = []
 
-        cuenta = cuentas_dict.get(codigo)
-        if not cuenta:
-            return jsonify({"error": f"La cuenta con código {codigo} no pertenece al template activo"}), 400
+        # 4️⃣ Procesar saldos
+        for item in saldos:
+            codigo = item.get("codigo")
+            nombre = item.get("nombre")
+            monto  = item.get("saldo")
 
-        # Validar nombre opcional
-        if nombre and cuenta.nombre != nombre:
-            return jsonify({"error": f"El nombre '{nombre}' no coincide con la cuenta '{cuenta.nombre}'"}), 400
+            if not codigo or monto is None:
+                return jsonify({"error": "Cada saldo debe incluir 'codigo' y 'saldo'"}), 400
 
-        # ✅ Insertar usando el ID del periodo
-        nuevo_saldo = SaldoMensualCTS(
-            cuentaid=cuenta.cuentaid,
-            periodoid=periodo.periodoid,   # <<-- aquí
-            saldo=monto,
-            sucursalid = sucursalid
-        )
-        db.session.add(nuevo_saldo)
+            cuenta = cuentas_dict.get(codigo)
+            if not cuenta:
+                return jsonify({"error": f"La cuenta con código {codigo} no pertenece al template activo"}), 400
 
-        registros_insertados.append({
-            "codigo": codigo,
-            "cuentaid": cuenta.cuentaid,
-            "nombre": cuenta.nombre,
+            if nombre and cuenta.nombre != nombre:
+                return jsonify({"error": f"El nombre '{nombre}' no coincide con la cuenta '{cuenta.nombre}'"}), 400
+
+            nuevo_saldo = SaldoMensualCTS(
+                cuentaid=cuenta.cuentaid,
+                periodoid=periodo.periodoid,
+                saldo=monto,
+                sucursalid=sucursalid
+            )
+            db.session.add(nuevo_saldo)
+
+            registros_insertados.append({
+                "codigo": codigo,
+                "cuentaid": cuenta.cuentaid,
+                "nombre": cuenta.nombre,
+                "periodoid": periodo.periodoid,
+                "sucursalid": sucursalid,
+                "saldo": float(monto)
+            })
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Saldos cargados exitosamente",
+            "templateid": template.templateid,
             "periodoid": periodo.periodoid,
-            "sucursalid" : sucursalid,
-            "saldo": float(monto)
-        })
+            "registros": registros_insertados
+        }), 201
 
-    db.session.commit()
-
-    return jsonify({
-        "message": "Saldos cargados exitosamente",
-        "templateid": template.templateid,
-        "periodoid": periodo.periodoid,
-        "registros": registros_insertados
-    }), 201
 @saldo_mensual_cts_bp.route('/api/saldos/ultimo', methods=['POST'])
 def api_obtener_ultimo_saldo():
     data = request.get_json()
