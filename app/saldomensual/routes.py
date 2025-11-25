@@ -90,7 +90,6 @@ def api_crear_saldos():
             "periodoid": periodo.periodoid,
             "registros": registros_insertados
         }), 201
-
 @saldo_mensual_cts_bp.route('/api/saldos/ultimo', methods=['POST'])
 def api_obtener_ultimo_saldo():
     data = request.get_json()
