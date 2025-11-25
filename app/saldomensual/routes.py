@@ -16,6 +16,7 @@ def api_crear_saldos():
     if not data or not all(k in data for k in ("institutionid", "sucursalid", "anio", "mes", "saldos")):
         return jsonify({"error": "institutionid, sucursalid, anio, mes y saldos son requeridos"}), 400
 
+    institutionid = data["institutionid"]
     sucursalid = data["sucursalid"]
     anio       = data["anio"]
     mes        = data["mes"]
@@ -26,10 +27,10 @@ def api_crear_saldos():
     if not periodo:
         return jsonify({"error": f"No existe un periodo registrado para {anio}-{mes}"}), 400
 
-    # 2️⃣ Template activo de la sucursal
-    template = SucursalTemplate.query.filter_by(sucursalid=sucursalid, activo=True).first()
+    # 2️⃣ Template activo de la institution
+    template = InstitutionTemplate.query.filter_by(institutionid=institutionid, activo=True).first()
     if not template:
-        return jsonify({"error": "No existe template activo para esta sucursal"}), 400
+        return jsonify({"error": "No existe template activo para esta institution"}), 400
 
     # 3️⃣ Cuentas válidas del template
     cuentas = CuentaContable.query.filter_by(templateid=template.templateid).all()
