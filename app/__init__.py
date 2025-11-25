@@ -15,6 +15,8 @@ def create_app():
      app,
      resources={r"/api/*":{"origins":["http://localhost:4200","http://127.0.0.1:4200"]},
                 r"/institucionesListar": {"origins":["http://localhost:4200","http://127.0.0.1:4200"]},
+                r"/Createsaldos": {"origins":["http://localhost:4200","http://127.0.0.1:4200"]},
+                
      },
      supports_credentials=True,
      methods=["GET","POST","PUT","DELETE","OPTIONS"],
