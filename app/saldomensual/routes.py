@@ -8,7 +8,7 @@ from app.models import SaldoMensualCTS, Template_Balance, CuentaContable, Period
 
 saldo_mensual_cts_bp = Blueprint('saldo_mensual_cts_bp', __name__)
 
-@saldo_mensual_cts_bp.route('/api/Createsaldos', methods=['POST', 'GET'])
+@saldo_mensual_cts_bp.route('/api/saldos/Createsaldos', methods=['POST', 'GET'])
 def api_crear_saldos():
 
     # Si es GET devolvemos un mensaje o datos
