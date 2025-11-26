@@ -6,6 +6,7 @@ from werkzeug.utils import secure_filename
 from sqlalchemy import text
 from sqlalchemy import insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 from app.models import SaldoMensualCTS, Template_Balance, CuentaContable, Periodo, Modelo, SucursalTemplate, InstitutionTemplate
 
 saldo_mensual_cts_bp = Blueprint('saldo_mensual_cts_bp', __name__)
@@ -103,9 +104,9 @@ def api_crear_saldos():
             return jsonify({"error": "No hay filas válidas para insertar"}), 400
 
         # 5) UPSERT masivo (ON CONFLICT DO UPDATE)
-        stmt = insert(SaldoMensualCTS).values(filas)
+        stmt = pg_insert(SaldoMensualCTS.__table__).values(filas)
         stmt = stmt.on_conflict_do_update(
-            index_elements=["cuentaid", "periodoid"],
+            index_elements=["cuentaid", "periodoid"],  # debe coincidir con tu UNIQUE real
             set_={
                 "saldo": stmt.excluded.saldo,
                 "sucursalid": stmt.excluded.sucursalid,
