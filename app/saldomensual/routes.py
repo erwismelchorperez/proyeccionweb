@@ -7,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy import insert
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.dialects.postgresql import insert as pg_insert
+from collections import Counter
 from app.models import SaldoMensualCTS, Template_Balance, CuentaContable, Periodo, Modelo, SucursalTemplate, InstitutionTemplate
 
 saldo_mensual_cts_bp = Blueprint('saldo_mensual_cts_bp', __name__)
@@ -66,6 +67,39 @@ def api_crear_saldos():
         cuentas_por_codigo = {c.codigo: c for c in cuentas}
         if not cuentas_por_codigo:
             return jsonify({"error": "El template activo no tiene cuentas contables"}), 400
+        
+        # ======= VALIDACIÓN DE DUPLICADOS POR CLAVE REAL =======
+        # Construye llaves reales de conflicto y detecta repetidos
+        llaves = []  # (cuentaid, periodoid, sucursalid, codigo)
+        for item in saldos:
+            codigo = item.get("codigo")
+            monto  = item.get("saldo")
+            if not codigo or monto is None:
+                return jsonify({"error": "Cada saldo debe incluir 'codigo' y 'saldo'"}), 400
+            cuenta = cuentas_por_codigo.get(codigo)
+            if not cuenta:
+                return jsonify({"error": f"La cuenta con código {codigo} no pertenece al template activo"}), 400
+            llaves.append((int(cuenta.cuentaid), int(periodo.periodoid), int(sucursalid), codigo))
+
+        cnt = Counter((cid, pid, sid) for (cid, pid, sid, _codigo) in llaves)
+        dups = [k for k, n in cnt.items() if n > 1]
+        if dups:
+            ejemplos = []
+            for (cuentaid, periodoid, sid) in dups[:10]:  # máx 10 para no saturar
+                cods = [codigo for (cid, pid, ssid, codigo) in llaves
+                        if cid == cuentaid and pid == periodoid and ssid == sid]
+                ejemplos.append({
+                    "cuentaid": cuentaid,
+                    "periodoid": periodoid,
+                    "sucursalid": sid,
+                    "codigos_en_payload": cods,
+                    "veces": len(cods)
+                })
+            return jsonify({
+                "error": "Filas duplicadas para la misma clave (cuentaid, periodoid, sucursalid). El mismo POST intenta afectar la misma fila varias veces.",
+                "ejemplos": ejemplos
+            }), 400
+        # ======= FIN VALIDACIÓN DUPLICADOS =======
 
         # 4) construir filas para UPSERT
         filas = []
