@@ -50,7 +50,7 @@ def api_crear_saldos():
         if not periodo:
             # si NO quieres crearlo automáticamente, deja el 400
             return jsonify({"error": f"No existe un periodo registrado para {anio}-{mes}"}), 400
-            # o créalo:
+            # o hacer lo anterior manual:
             # periodo = Periodo(anio=anio, mes=mes)
             # db.session.add(periodo)
             # db.session.flush()
