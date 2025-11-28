@@ -138,7 +138,7 @@ def api_crear_saldos():
             return jsonify({"error": "No hay filas válidas para insertar"}), 400
 
         # 5) UPSERT masivo (ON CONFLICT DO UPDATE)
-        stmt = pg_insert(SaldoMensualCTS.__table__).values(filas)
+        stmt = pg_insert(SaldoMensualCTS).values(filas)
         stmt = stmt.on_conflict_do_update(
             index_elements=["cuentaid", "periodoid"],  # debe coincidir con tu UNIQUE real
             set_={
