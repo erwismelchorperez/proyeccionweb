@@ -12,8 +12,8 @@ from app.models import SaldoMensualCTS, Template_Balance, CuentaContable, Period
 
 saldo_mensual_cts_bp = Blueprint('saldo_mensual_cts_bp', __name__)
 
-@saldo_mensual_cts_bp.route('/api/saldos/Createsaldos', methods=['POST', 'GET'])
-def api_crear_saldos():
+@saldo_mensual_cts_bp.route('/api/saldos/CreatesaldosV1', methods=['POST', 'GET'])
+def api_crear_saldosV1():
 
     # Si es GET devolvemos un mensaje o datos
     if request.method == 'GET':
@@ -166,6 +166,147 @@ def api_crear_saldos():
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": "Error interno", "detalle": str(e)}), 500
+@saldo_mensual_cts_bp.route('/api/saldos/Createsaldos', methods=['POST', 'GET'])
+def api_crear_saldos():
+
+    # Si es GET devolvemos un mensaje simple
+    if request.method == 'GET':
+        return jsonify({
+            "message": "Endpoint activo. Usa POST para enviar saldos."
+        }), 200
+
+    # POST
+    try:
+        data = request.get_json(silent=True) or {}
+
+        requeridos = ("institutionid", "sucursalid", "anio", "mes", "saldos")
+        faltantes = [k for k in requeridos if k not in data]
+        if faltantes:
+            return jsonify({"error": f"Faltan campos: {', '.join(faltantes)}"}), 400
+
+        institutionid = int(data["institutionid"])
+        sucursalid    = int(data["sucursalid"])
+        anio          = int(data["anio"])
+
+        # mes puede venir como entero o dict
+        mes = data["mes"]
+        mes = int(mes.get("mes") if isinstance(mes, dict) else mes)
+        
+        if not (1 <= mes <= 12):
+            return jsonify({"error": "mes debe estar en 1..12"}), 400
+
+        saldos = data["saldos"]
+        if not isinstance(saldos, list) or not saldos:
+            return jsonify({"error": "saldos debe ser una lista no vacía"}), 400
+
+        # 1) periodo
+        periodo = Periodo.query.filter_by(anio=anio, mes=mes).first()
+        if not periodo:
+            return jsonify({"error": f"No existe un periodo registrado para {anio}-{mes}"}), 400
+
+        # 2) template activo
+        template_rel = InstitutionTemplate.query.filter_by(
+            institutionid=institutionid,
+            activo=True
+        ).first()
+
+        if not template_rel:
+            return jsonify({"error": "No existe template activo para esta institución"}), 400
+
+        # 3) cuentas válidas del template
+        cuentas = CuentaContable.query.filter_by(templateid=template_rel.templateid).all()
+        cuentas_por_codigo = {c.codigo: c for c in cuentas}
+
+        if not cuentas_por_codigo:
+            return jsonify({"error": "El template activo no tiene cuentas contables"}), 400
+
+        # 4) construir filas
+        filas = []
+        registros_resumen = []
+
+        for item in saldos:
+            codigo = item.get("codigo")
+            nombre = item.get("nombre")
+            monto  = item.get("saldo")
+
+            if not codigo or monto is None:
+                return jsonify({"error": "Cada saldo debe incluir 'codigo' y 'saldo'"}), 400
+
+            cuenta = cuentas_por_codigo.get(codigo)
+            if not cuenta:
+                return jsonify({"error": f"La cuenta con código {codigo} no pertenece al template activo"}), 400
+
+            if nombre and cuenta.nombre != nombre:
+                return jsonify({
+                    "error": f"El nombre '{nombre}' no coincide con la cuenta '{cuenta.nombre}'"
+                }), 400
+
+            filas.append({
+                "cuentaid":   cuenta.cuentaid,
+                "periodoid":  periodo.periodoid,
+                "saldo":      monto,
+                "sucursalid": sucursalid
+            })
+
+            registros_resumen.append({
+                "codigo": codigo,
+                "cuentaid": cuenta.cuentaid,
+                "nombre": cuenta.nombre,
+                "periodoid": periodo.periodoid,
+                "sucursalid": sucursalid,
+                "saldo": float(monto)
+            })
+
+        if not filas:
+            return jsonify({"error": "No hay filas válidas para insertar"}), 400
+
+        # 5) VALIDACIÓN GLOBAL:
+        # Si ya existe un saldo para ESTE periodo y ESTA sucursal → impedir toda la carga
+        existen_saldos = (
+            db.session.query(SaldoMensualCTS)
+            .filter_by(periodoid=periodo.periodoid, sucursalid=sucursalid)
+            .first()
+        )
+
+        if existen_saldos:
+            return jsonify({
+                "error": "No se pueden registrar saldos",
+                "detalle": f"Ya existen saldos cargados para el periodo {periodo.periodoid} "
+                           f"y la sucursal {sucursalid}. Elimínelos antes de volver a cargar."
+            }), 400
+
+        # 6) Inserción normal (solo ALTAS)
+        for fila in filas:
+            nuevo = SaldoMensualCTS(
+                cuentaid=fila["cuentaid"],
+                periodoid=fila["periodoid"],
+                saldo=fila["saldo"],
+                sucursalid=fila["sucursalid"]
+            )
+            db.session.add(nuevo)
+
+        db.session.commit()
+
+        return jsonify({
+            "message": "Saldos registrados exitosamente",
+            "templateid": template_rel.templateid,
+            "periodoid": periodo.periodoid,
+            "registros": registros_resumen,
+            "insertados": len(filas)
+        }), 201
+
+    except IntegrityError as e:
+        db.session.rollback()
+        return jsonify({"error": "Integridad de datos", "detalle": str(e.orig)}), 409
+
+    except SQLAlchemyError as e:
+        db.session.rollback()
+        return jsonify({"error": "DB error", "detalle": str(e)}), 500
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"error": "Error interno", "detalle": str(e)}), 500
+
 @saldo_mensual_cts_bp.route('/api/saldos/ultimo', methods=['POST'])
 def api_obtener_ultimo_saldo():
     data = request.get_json()
