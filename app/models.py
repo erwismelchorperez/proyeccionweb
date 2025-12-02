@@ -134,6 +134,10 @@ class ValidacionesCtgoCts(db.Model):
 class SaldoMensualCTS(db.Model):
     __tablename__ = 'saldo_mensual_cts'
 
+    __table_args__ = (
+        db.UniqueConstraint('cuentaid', 'periodoid', 'sucursalid', name='saldo_mensual_cts_unique'),
+    )
+
     saldoctsid = db.Column(db.Integer, primary_key=True)
     cuentaid = db.Column(db.Integer, db.ForeignKey('cuenta_contable.cuentaid'), nullable=False)
     periodoid = db.Column(db.Integer, db.ForeignKey('periodo.periodoid'), nullable=False)
