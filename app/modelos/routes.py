@@ -4,7 +4,7 @@ import io
 import csv
 from werkzeug.utils import secure_filename
 from sqlalchemy import text
-from app.models import CuentaContable, Modelo
+from app.models import CuentaContable, Modelo, Template_Balance
 
 modelos_bp = Blueprint('modelos_bp', __name__)
 
@@ -46,22 +46,66 @@ def crear_modelo():
         "sucursalid": nuevo_modelo.sucursalid
     }), 201
 @modelos_bp.route('/api/modelos/list', methods=['POST'])
-def listar_modelos():
-    data = request.get_json() or {}
-    cuentaid = data.get('cuentaid')
+def api_obtener_modelos_por_template():
+    data = request.get_json(silent=True) or {}
 
-    query = Modelo.query
-    if cuentaid:
-        query = query.filter_by(cuentaid=cuentaid)
+    if not all(k in data for k in ("templateid", "sucursalid")):
+        return jsonify({
+            "error": "templateid y sucursalid son requeridos"
+        }), 400
 
-    modelos = query.all()
-    return jsonify([
-        {
-            "modeloid": m.modeloid,
-            "cuentaid": m.cuentaid,
-            "modelo": m.modelo,
-            "ubicacion": m.ubicacion,
-            "variables":m.variables
-        } for m in modelos
-    ])
-# listas todos los modelos por sucursal
+    templateid = int(data["templateid"])
+    sucursalid = int(data["sucursalid"])
+
+    # 1️⃣ Validar template
+    template = Template_Balance.query.filter_by(templateid=templateid).first()
+    if not template:
+        return jsonify({
+            "error": "El template no existe"
+        }), 404
+
+    # 2️⃣ Query principal (equivalente al SELECT)
+    resultados = (
+        db.session.query(
+            Template_Balance.templateid,
+            CuentaContable.cuentaid,
+            CuentaContable.codigo,
+            CuentaContable.nombre,
+            Modelo.modeloid,
+            Modelo.modelo,
+            Modelo.ubicacion
+        )
+        .join(CuentaContable, CuentaContable.templateid == Template_Balance.templateid)
+        .join(Modelo, Modelo.cuentaid == CuentaContable.cuentaid)
+        .filter(
+            Template_Balance.templateid == templateid,
+            Modelo.sucursalid == sucursalid
+        )
+        .order_by(CuentaContable.codigo.asc())
+        .all()
+    )
+
+    if not resultados:
+        return jsonify({
+            "error": "No existen modelos registrados para este template y sucursal"
+        }), 404
+
+    # 3️⃣ Formatear respuesta
+    data_respuesta = []
+    for r in resultados:
+        data_respuesta.append({
+            "cuentaid": r.cuentaid,
+            "codigo": r.codigo,
+            "nombre": r.nombre,
+            "modeloid": r.modeloid,
+            "modelo": r.modelo,
+            "ubicacion": r.ubicacion
+        })
+
+    return jsonify({
+        "message": "Modelos encontrados",
+        "templateid": templateid,
+        "sucursalid": sucursalid,
+        "total": len(data_respuesta),
+        "data": data_respuesta
+    }), 200
